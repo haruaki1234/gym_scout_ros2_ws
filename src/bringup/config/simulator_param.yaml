@@ -1,0 +1,10 @@
+simulator_node:
+  ros__parameters:
+    dt: 0.01
+    max_vel: 5.0
+    max_acc: 5.0
+    max_ang_vel: 5.0
+    max_ang_acc: 5.0
+    init_x: 2.0
+    init_y: 2.0
+    init_yaw: 0.0

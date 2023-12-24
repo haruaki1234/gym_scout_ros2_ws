@@ -7,10 +7,14 @@
 #include <nav_msgs/msg/path.hpp>
 #include <nav_msgs/msg/grid_cells.hpp>
 #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
+#include <geometry_msgs/msg/pose_stamped.hpp>
+#include <tf2/utils.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
 #include <Eigen/Dense>
 #include <opencv2/opencv.hpp>
 
+#include "utils/utils.hpp"
 #include "a_star.hpp"
 
 namespace tlab
@@ -21,7 +25,7 @@ private:
     AStar a_star_;
     double resolution_ = 0.1;
     std::unordered_set<Eigen::Vector2i> map_;
-    std::optional<Eigen::Vector2i> start_;
+    Eigen::Vector3d current_pos_;
 
     nav_msgs::msg::GridCells grid_msg_;
 
@@ -80,26 +84,15 @@ public:
         grid_msg_.cell_height = resolution_;
         grid_pub->publish(grid_msg_);
 
-        static auto start_sub = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>("initialpose", rclcpp::QoS(10).reliable(), [&](const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg) {
-            auto start = to_grid(Eigen::Vector2d(msg->pose.pose.position.x, msg->pose.pose.position.y));
-            if (map_.find(start) != map_.end()) {
-                RCLCPP_WARN(this->get_logger(), "start position is in the wall");
-                return;
-            }
-            start_ = start;
-        });
+        static auto current_pos_sub = create_subscription<geometry_msgs::msg::PoseStamped>("current_pos", rclcpp::QoS(10).reliable(), [&](const geometry_msgs::msg::PoseStamped::SharedPtr msg) { current_pos_ = make_eigen_vector3d(msg->pose); });
 
         static auto goal_sub = this->create_subscription<geometry_msgs::msg::PoseStamped>("goal_pose", rclcpp::QoS(10).reliable(), [&](const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
-            if (!start_) {
-                RCLCPP_WARN(this->get_logger(), "start position is not set");
-                return;
-            }
             auto goal = to_grid(Eigen::Vector2d(msg->pose.position.x, msg->pose.position.y));
             if (map_.find(goal) != map_.end()) {
                 RCLCPP_WARN(this->get_logger(), "goal position is in the wall");
                 return;
             }
-            auto path = a_star_.find_path(start_.value(), goal, map_);
+            auto path = a_star_.find_path(to_grid(current_pos_.head<2>()), goal, map_);
             RCLCPP_INFO(this->get_logger(), "path found");
             nav_msgs::msg::Path path_msg;
             path_msg.header.frame_id = "map";
@@ -113,13 +106,9 @@ public:
                 path_msg.poses.push_back(pose);
             }
             path_pub->publish(path_msg);
-            start_ = std::nullopt;
         });
 
-        static auto timer = this->create_wall_timer(100ms, [&]() {
-            grid_msg_.header.stamp = this->get_clock()->now();
-            grid_pub->publish(grid_msg_);
-        });
+        static auto timer = this->create_wall_timer(100ms, [&]() { grid_pub->publish(grid_msg_); });
     }
 
     Eigen::Vector2i to_grid(const Eigen::Vector2d& pos) const { return Eigen::Vector2i(pos.x() / resolution_, pos.y() / resolution_); }

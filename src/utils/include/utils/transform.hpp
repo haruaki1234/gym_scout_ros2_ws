@@ -1,6 +1,6 @@
 #pragma once
 
-#include "./Vector2d.hpp"
+#include "./vector2.hpp"
 
 namespace tlab
 {
@@ -9,21 +9,21 @@ struct Transform {
     double x, y, theta;
     Transform() = default;
     constexpr Transform(const double _x, const double _y, const double _theta) : x(_x), y(_y), theta(_theta) {}
-    constexpr Transform(const Vector2d& _xy, const double _theta) : x(_xy.x), y(_xy.y), theta(_theta) {}
+    constexpr Transform(const Vector2& _xy, const double _theta) : x(_xy.x), y(_xy.y), theta(_theta) {}
     constexpr Transform(const Transform&) = default;
-    constexpr Vector2d make_Vector2d() const { return Vector2d(x, y); }
+    constexpr Vector2 make_vector2() const { return Vector2(x, y); }
     constexpr void set(double vx, double vy, double vtheta)
     {
         x = vx;
         y = vy;
         theta = vtheta;
     }
-    double distance() const { return Vector2d(x, y).norm(); }
-    void rotate(const double theta) { rotate(Vector2d::zero(), theta); }
-    void rotate(const double rotX, const double rotY, const double theta) { rotate(Vector2d(rotX, rotY), theta); }
-    void rotate(Vector2d rotPos, const double theta)
+    double distance() const { return Vector2(x, y).norm(); }
+    void rotate(const double theta) { rotate(Vector2::zero(), theta); }
+    void rotate(const double rotX, const double rotY, const double theta) { rotate(Vector2(rotX, rotY), theta); }
+    void rotate(Vector2 rotPos, const double theta)
     {
-        Vector2d p = make_Vector2d() - rotPos;
+        Vector2 p = make_vector2() - rotPos;
         p.rotate(theta);
         x = p.x + rotPos.x;
         y = p.y + rotPos.y;
@@ -62,18 +62,18 @@ struct Transform {
 
         return *this;
     }
-    constexpr Transform operator+(const Vector2d& v) const { return {x + v.x, y + v.y, theta}; }
-    constexpr Transform operator-(const Vector2d& v) const { return {x - v.x, y - v.y, theta}; }
+    constexpr Transform operator+(const Vector2& v) const { return {x + v.x, y + v.y, theta}; }
+    constexpr Transform operator-(const Vector2& v) const { return {x - v.x, y - v.y, theta}; }
     constexpr Transform operator+(const double angle) const { return {x, y, theta + angle}; }
     constexpr Transform operator-(const double angle) const { return {x, y, theta - angle}; }
-    constexpr Transform& operator+=(const Vector2d& v)
+    constexpr Transform& operator+=(const Vector2& v)
     {
         x += v.x;
         y += v.y;
 
         return *this;
     }
-    constexpr Transform& operator-=(const Vector2d& v)
+    constexpr Transform& operator-=(const Vector2& v)
     {
         x -= v.x;
         y -= v.y;

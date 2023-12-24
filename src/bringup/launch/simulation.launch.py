@@ -17,39 +17,21 @@ from launch_ros.descriptions import ComposableNode
 
 def generate_launch_description():
     pkg_dir = get_package_share_directory("bringup")
-
     list = [
         Node(
-            package='global_path_planner',
-            executable='global_path_planner',
+            package='simulator',
+            executable='simulator',
             output='screen',
             parameters=[
-                os.path.join(pkg_dir, "config", "global_path_planner_param.yaml")
+                os.path.join(pkg_dir, "config", "simulator_param.yaml")
             ],
             respawn = True
         ),
-        
-        Node(
-            package='route_following',
-            executable='route_following',
-            output='screen',
-            parameters=[
-                os.path.join(pkg_dir, "config", "route_following_param.yaml")
-            ],
-            respawn = True
-        ),
-
-        Node(
-            package='rviz2',
-            executable='rviz2',
-            arguments=['-d', os.path.join(pkg_dir, "config", "rviz_config.rviz")]
-        ),
-
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
-                [os.path.join(pkg_dir, 'launch', 'static_tf.launch.py')]
+                [os.path.join(pkg_dir, 'launch', 'common.launch.py')]
             )
-        ),
+        )
     ]
 
     return LaunchDescription(list)
