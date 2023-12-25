@@ -103,6 +103,10 @@ private:
     double score_map_distance_waight_;
     double score_integral_error_waight_;
 
+    double near_goal_control_distance_;
+    double near_goal_control_pos_kp_;
+    double near_goal_control_angle_kp_;
+
     std::vector<Score> scores_;
 
 public:
@@ -140,6 +144,13 @@ public:
         score_map_distance_waight_ = get_parameter("score_map_distance_waight").as_double();
         declare_parameter<double>("score_integral_error_waight", 1.0);
         score_integral_error_waight_ = get_parameter("score_integral_error_waight").as_double();
+
+        declare_parameter<double>("near_goal_control_distance", 1.0);
+        near_goal_control_distance_ = get_parameter("near_goal_control_distance").as_double();
+        declare_parameter<double>("near_goal_control_pos_kp", 1.0);
+        near_goal_control_pos_kp_ = get_parameter("near_goal_control_pos_kp").as_double();
+        declare_parameter<double>("near_goal_control_angle_kp", 1.0);
+        near_goal_control_angle_kp_ = get_parameter("near_goal_control_angle_kp").as_double();
 
         scores_.push_back(Score(score_local_target_distance_waight_, [&](const local_path_data_t& path) { return calc_score_local_target_distance(path); }));
         scores_.push_back(Score(score_local_target_angle_waight_, [&](const local_path_data_t& path) { return calc_score_local_target_angle(path); }));
@@ -192,6 +203,21 @@ public:
                 vel_msg.twist.linear.x = 0;
                 vel_msg.twist.linear.y = 0;
                 vel_msg.twist.angular.z = 0;
+                velocity_pub->publish(vel_msg);
+                return;
+            }
+
+            if (auto goal_pos = make_eigen_vector3d(global_path_.back().pose); (goal_pos - current_pos_).head<2>().norm() < near_goal_control_distance_) {
+                auto e = goal_pos - current_pos_;
+                auto target_vel = Eigen::Vector3d(e.x() * near_goal_control_pos_kp_, e.y() * near_goal_control_pos_kp_, e.z() * near_goal_control_angle_kp_);
+                target_vel.head<2>() = rotate_2d(target_vel.head<2>(), -current_pos_.z());
+                target_vel.x() = std::clamp(target_vel.x(), -max_vel_, max_vel_);
+                target_vel.y() = std::clamp(target_vel.y(), -max_vel_, max_vel_);
+                target_vel.z() = std::clamp(target_vel.z(), -max_angle_vel_, max_angle_vel_);
+                geometry_msgs::msg::TwistStamped vel_msg;
+                vel_msg.header.frame_id = "map";
+                vel_msg.header.stamp = this->get_clock()->now();
+                vel_msg.twist = make_twist(target_vel);
                 velocity_pub->publish(vel_msg);
                 return;
             }
