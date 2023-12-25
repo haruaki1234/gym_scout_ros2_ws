@@ -207,28 +207,6 @@ public:
                 return;
             }
 
-            if (auto goal_pos = make_eigen_vector3d(global_path_.back().pose); (goal_pos - current_pos_).head<2>().norm() < near_goal_control_distance_) {
-                auto e = goal_pos - current_pos_;
-                auto target_vel = Eigen::Vector3d(e.x() * near_goal_control_pos_kp_, e.y() * near_goal_control_pos_kp_, e.z() * near_goal_control_angle_kp_);
-                target_vel.head<2>() = rotate_2d(target_vel.head<2>(), -current_pos_.z());
-                target_vel.x() = std::clamp(target_vel.x(), -max_vel_, max_vel_);
-                target_vel.y() = std::clamp(target_vel.y(), -max_vel_, max_vel_);
-                target_vel.z() = std::clamp(target_vel.z(), -max_angle_vel_, max_angle_vel_);
-                geometry_msgs::msg::TwistStamped vel_msg;
-                vel_msg.header.frame_id = "map";
-                vel_msg.header.stamp = this->get_clock()->now();
-                vel_msg.twist = make_twist(target_vel);
-                velocity_pub->publish(vel_msg);
-                return;
-            }
-
-            auto start_time = this->get_clock()->now();
-
-            auto choices_path = make_choices_path();
-            for (auto& p : choices_path) {
-                path_publish(p.path, candidate_path_pub);
-            }
-
             {
                 double min_e = std::numeric_limits<double>::infinity();
                 for (size_t i = near_index_; i < global_path_.size(); i++) {
@@ -257,6 +235,28 @@ public:
                 local_target_pos_msg.header.stamp = this->get_clock()->now();
                 local_target_pos_msg.pose = make_pose(local_target_pos_);
                 local_target_pos_pub->publish(local_target_pos_msg);
+            }
+
+            if (auto goal_pos = make_eigen_vector3d(global_path_.back().pose); (goal_pos - current_pos_).head<2>().norm() < near_goal_control_distance_) {
+                auto e = goal_pos - current_pos_;
+                auto target_vel = Eigen::Vector3d(e.x() * near_goal_control_pos_kp_, e.y() * near_goal_control_pos_kp_, e.z() * near_goal_control_angle_kp_);
+                target_vel.head<2>() = rotate_2d(target_vel.head<2>(), -current_pos_.z());
+                target_vel.x() = std::clamp(target_vel.x(), -max_vel_, max_vel_);
+                target_vel.y() = std::clamp(target_vel.y(), -max_vel_, max_vel_);
+                target_vel.z() = std::clamp(target_vel.z(), -max_angle_vel_, max_angle_vel_);
+                geometry_msgs::msg::TwistStamped vel_msg;
+                vel_msg.header.frame_id = "map";
+                vel_msg.header.stamp = this->get_clock()->now();
+                vel_msg.twist = make_twist(target_vel);
+                velocity_pub->publish(vel_msg);
+                return;
+            }
+
+            auto start_time = this->get_clock()->now();
+
+            auto choices_path = make_choices_path();
+            for (auto& p : choices_path) {
+                path_publish(p.path, candidate_path_pub);
             }
 
             Eigen::VectorXd score = Eigen::VectorXd::Zero(choices_path.size());
