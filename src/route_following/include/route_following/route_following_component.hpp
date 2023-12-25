@@ -14,6 +14,7 @@
 #include <Eigen/Dense>
 
 #include "utils/utils.hpp"
+#include "utils/math_util.hpp"
 #include "utils/golden_search.hpp"
 #include "utils/kd_tree.hpp"
 
@@ -94,9 +95,11 @@ private:
     int vel_split_num_;
     double simulation_time_;
     int simulation_step_;
+    double collision_map_distance_;
+    double ignore_map_distance_;
 
-    double score_vel_norm_waight_;
-    double score_goal_distance_waight_;
+    double score_local_target_distance_waight_;
+    double score_local_target_angle_waight_;
     double score_map_distance_waight_;
     double score_integral_error_waight_;
 
@@ -124,18 +127,22 @@ public:
         simulation_time_ = get_parameter("simulation_time").as_double();
         declare_parameter<int>("simulation_step", 10);
         simulation_step_ = get_parameter("simulation_step").as_int();
+        declare_parameter<double>("collision_map_distance", 1.0);
+        collision_map_distance_ = get_parameter("collision_map_distance").as_double();
+        declare_parameter<double>("ignore_map_distance", 1.0);
+        ignore_map_distance_ = get_parameter("ignore_map_distance").as_double();
 
-        declare_parameter<double>("score_vel_norm_waight", 1.0);
-        score_vel_norm_waight_ = get_parameter("score_vel_norm_waight").as_double();
-        declare_parameter<double>("score_goal_distance_waight", 1.0);
-        score_goal_distance_waight_ = get_parameter("score_goal_distance_waight").as_double();
+        declare_parameter<double>("score_local_target_distance_waight", 1.0);
+        score_local_target_distance_waight_ = get_parameter("score_local_target_distance_waight").as_double();
+        declare_parameter<double>("score_local_target_angle_waight", 1.0);
+        score_local_target_angle_waight_ = get_parameter("score_local_target_angle_waight").as_double();
         declare_parameter<double>("score_map_distance_waight", 1.0);
         score_map_distance_waight_ = get_parameter("score_map_distance_waight").as_double();
         declare_parameter<double>("score_integral_error_waight", 1.0);
         score_integral_error_waight_ = get_parameter("score_integral_error_waight").as_double();
 
-        scores_.push_back(Score(score_vel_norm_waight_, [&](const local_path_data_t& path) { return calc_score_vel_norm(path); }));
-        scores_.push_back(Score(score_goal_distance_waight_, [&](const local_path_data_t& path) { return calc_score_goal_distance(path); }));
+        scores_.push_back(Score(score_local_target_distance_waight_, [&](const local_path_data_t& path) { return calc_score_local_target_distance(path); }));
+        scores_.push_back(Score(score_local_target_angle_waight_, [&](const local_path_data_t& path) { return calc_score_local_target_angle(path); }));
         scores_.push_back(Score(score_map_distance_waight_, [&](const local_path_data_t& path) { return calc_score_map_distance(path); }));
         scores_.push_back(Score(score_integral_error_waight_, [&](const local_path_data_t& path) { return calc_score_integral_error(path); }));
 
@@ -197,15 +204,19 @@ public:
             }
 
             {
-                auto distance = [&](const int n) {
-                    Eigen::Vector2d global_path_pos(global_path_[n].pose.position.x, global_path_[n].pose.position.y);
-                    return (global_path_pos - current_pos_.head<2>()).norm();
-                };
-                near_index_ = golden_search<int>(distance, near_index_, global_path_.size() - 1, 10);
+                double min_e = std::numeric_limits<double>::infinity();
+                for (size_t i = near_index_; i < global_path_.size(); i++) {
+                    auto pos = Eigen::Vector2d(global_path_[i].pose.position.x, global_path_[i].pose.position.y);
+                    double e = (pos - current_pos_.head<2>()).norm();
+                    if (e < min_e) {
+                        min_e = e;
+                        near_index_ = i;
+                    }
+                }
                 int target_index = near_index_;
                 double route_distance = 0;
                 auto prev_pos = Eigen::Vector2d(global_path_[near_index_].pose.position.x, global_path_[near_index_].pose.position.y);
-                for (size_t i = near_index_; i < global_path_.size(); i++) {
+                for (size_t i = target_index; i < global_path_.size(); i++) {
                     auto pos = Eigen::Vector2d(global_path_[i].pose.position.x, global_path_[i].pose.position.y);
                     route_distance += (pos - prev_pos).norm();
                     prev_pos = pos;
@@ -214,7 +225,7 @@ public:
                         break;
                     }
                 }
-                local_target_pos_ = Eigen::Vector3d(global_path_[target_index].pose.position.x, global_path_[target_index].pose.position.y, tf2::getYaw(global_path_[target_index].pose.orientation));
+                local_target_pos_ = make_eigen_vector3d(global_path_[target_index].pose);
                 geometry_msgs::msg::PoseStamped local_target_pos_msg;
                 local_target_pos_msg.header.frame_id = "map";
                 local_target_pos_msg.header.stamp = this->get_clock()->now();
@@ -246,7 +257,7 @@ private:
         pos_vec.reserve(simulation_step_);
         double dt = simulation_time_ / simulation_step_;
         for (int i = 0; i < simulation_step_; i++) {
-            auto rotate_vel = rotate_2d(vel.head<2>(), -pos.z());
+            auto rotate_vel = rotate_2d(vel.head<2>(), pos.z());
             pos.x() += rotate_vel.x() * dt;
             pos.y() += rotate_vel.y() * dt;
             pos.z() += vel.z() * dt;
@@ -256,30 +267,30 @@ private:
     }
     std::vector<local_path_data_t> make_choices_path() const
     {
-        auto rotate_vel = rotate_2d(current_vel_.head<2>(), current_pos_.z());
-        // double range_min_x = std::max(rotate_vel.x() - max_acc_ * control_period_, -max_vel_);
-        // double range_max_x = std::min(rotate_vel.x() + max_acc_ * control_period_, max_vel_);
-        double range_min_y = std::max(rotate_vel.y() - max_acc_ * control_period_, -max_vel_);
-        double range_max_y = std::min(rotate_vel.y() + max_acc_ * control_period_, max_vel_);
+        auto rotate_vel = rotate_2d(current_vel_.head<2>(), -current_pos_.z());
+        double range_min_x = std::max(rotate_vel.x() - max_acc_ * control_period_, -max_vel_);
+        double range_max_x = std::min(rotate_vel.x() + max_acc_ * control_period_, max_vel_);
+        // double range_min_y = std::max(rotate_vel.y() - max_acc_ * control_period_, -max_vel_);
+        // double range_max_y = std::min(rotate_vel.y() + max_acc_ * control_period_, max_vel_);
         double range_min_z = std::max(current_vel_.z() - max_angle_acc_ * control_period_, -max_angle_vel_);
         double range_max_z = std::min(current_vel_.z() + max_angle_acc_ * control_period_, max_angle_vel_);
 
         std::vector<local_path_data_t> choices_path;
-        // for (int i = 0; i <= vel_split_num_; i++) {
-        // double x = range_min_x + (range_max_x - range_min_x) / vel_split_num_ * i;
-        double x = 0;
-        for (int j = 0; j <= vel_split_num_; j++) {
-            double y = range_min_y + (range_max_y - range_min_y) / vel_split_num_ * j;
+        for (int i = 0; i <= vel_split_num_; i++) {
+            double x = range_min_x + (range_max_x - range_min_x) / vel_split_num_ * i;
+            // for (int j = 0; j <= vel_split_num_; j++) {
+            // double y = range_min_y + (range_max_y - range_min_y) / vel_split_num_ * j;
+            double y = 0;
             for (int k = 0; k <= vel_split_num_; k++) {
                 double z = range_min_z + (range_max_z - range_min_z) / vel_split_num_ * k;
                 choices_path.push_back(local_path_data_t(Eigen::Vector3d(x, y, z), simulation_pos(Eigen::Vector3d(x, y, z), current_pos_)));
             }
+            // }
         }
-        // }
         return choices_path;
     }
-    double calc_score_vel_norm(const local_path_data_t& path) const { return path.vel.head<2>().norm(); }
-    double calc_score_goal_distance(const local_path_data_t& path) const { return -(local_target_pos_ - path.path.back()).head<2>().norm(); }
+    double calc_score_local_target_distance(const local_path_data_t& path) const { return -(local_target_pos_ - path.path.back()).head<2>().norm(); }
+    double calc_score_local_target_angle(const local_path_data_t& path) const { return -std::abs(normalize_angle((local_target_pos_ - path.path.back()).z())); }
     double calc_score_map_distance(const local_path_data_t& path) const
     {
         if (!map_grid_) {
@@ -289,10 +300,12 @@ private:
         for (const auto& p : path.path) {
             auto pos = p.head<2>();
             double d = (pos - map_grid_->nn_serch(pos)).norm();
-            if (d < 0.5) {
+            if (d < collision_map_distance_) {
                 return -std::numeric_limits<double>::infinity();
             }
-            score -= 1.0 / d;
+            else if (d < ignore_map_distance_) {
+                score -= 1.0 / d;
+            }
         }
         return score;
     }

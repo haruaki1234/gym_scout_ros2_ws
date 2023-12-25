@@ -5,10 +5,12 @@ route_following_node:
     max_acc: 1.0
     max_ang_vel: 1.5
     max_ang_acc: 1.0
-    vel_split_num: 7
+    vel_split_num: 3
     simulation_time: 1.0
     simulation_step: 10
-    score_vel_norm_waight: 0.0
-    score_goal_distance_waight: 1.0
+    collision_map_distance: 0.5
+    ignore_map_distance: 1.0
+    score_local_target_distance_waight: 1.0
+    score_local_target_angle_waight: 0.3
     score_map_distance_waight: 0.2
     score_integral_error_waight: 0.2

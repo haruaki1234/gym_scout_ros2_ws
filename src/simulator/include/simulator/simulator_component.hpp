@@ -74,7 +74,7 @@ public:
                 current_vel_.x() = vx_filter.filtering();
                 current_vel_.y() = vy_filter.filtering();
                 current_vel_.z() = vth_filter.filtering();
-                auto rotate_vel = rotate_2d(current_vel_.head<2>(), -current_pos_.z());
+                auto rotate_vel = rotate_2d(current_vel_.head<2>(), current_pos_.z());
                 current_pos_.x() += rotate_vel.x() * dt_;
                 current_pos_.y() += rotate_vel.y() * dt_;
                 current_pos_.z() += current_vel_.z() * dt_;
@@ -83,7 +83,7 @@ public:
                 geometry_msgs::msg::TwistStamped current_vel_msg;
                 current_vel_msg.header.frame_id = "map";
                 current_vel_msg.header.stamp = this->get_clock()->now();
-                auto rotate_vel = rotate_2d(current_vel_.head<2>(), -current_pos_.z());
+                auto rotate_vel = rotate_2d(current_vel_.head<2>(), current_pos_.z());
                 current_vel_msg.twist = make_twist(rotate_vel.x(), rotate_vel.y(), current_vel_.z());
                 current_vel_pub->publish(current_vel_msg);
             }

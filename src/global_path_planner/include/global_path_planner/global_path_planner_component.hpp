@@ -97,12 +97,15 @@ public:
             nav_msgs::msg::Path path_msg;
             path_msg.header.frame_id = "map";
             path_msg.header.stamp = this->get_clock()->now();
-            for (const auto& p : path) {
-                auto world_pos = to_world(p);
+            for (int i = 0; i < (int)path.size(); i++) {
+                auto world_pos = to_world(path[i]);
                 geometry_msgs::msg::PoseStamped pose;
                 pose.header = path_msg.header;
-                pose.pose.position.x = world_pos.x();
-                pose.pose.position.y = world_pos.y();
+                pose.header.stamp = this->get_clock()->now();
+                int i1 = std::max(i - 1, 0);
+                int i2 = std::min(i + 1, (int)path.size() - 1);
+                double yaw = std::atan2(path[i2].y() - path[i1].y(), path[i2].x() - path[i1].x());
+                pose.pose = make_pose(world_pos.x(), world_pos.y(), yaw);
                 path_msg.poses.push_back(pose);
             }
             path_pub->publish(path_msg);
