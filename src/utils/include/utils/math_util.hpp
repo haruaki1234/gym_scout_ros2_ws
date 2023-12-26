@@ -51,7 +51,7 @@ static constexpr double degrees(T rad)
 {
     return (rad * RAD_TO_DEG);
 }
-static inline double normalize_angle_positive(double angle) { return std::fmod(std::fmod(angle, TWO_PI) + TWO_PI, PI); }
+static inline double normalize_angle_positive(double angle) { return std::fmod(std::fmod(angle, TWO_PI) + TWO_PI, TWO_PI); }
 static inline double normalize_angle(double angle)
 {
     double a = normalize_angle_positive(angle);

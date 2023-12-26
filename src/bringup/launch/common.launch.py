@@ -40,6 +40,16 @@ def generate_launch_description():
         ),
 
         Node(
+            package='localization',
+            executable='localization',
+            output='screen',
+            parameters=[
+                os.path.join(pkg_dir, "config", "localization_param.yaml")
+            ],
+            respawn = True
+        ),
+
+        Node(
             package='rviz2',
             executable='rviz2',
             arguments=['-d', os.path.join(pkg_dir, "config", "rviz_config.rviz")]

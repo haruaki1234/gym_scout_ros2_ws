@@ -22,11 +22,21 @@ private:
     double max_ang_vel_ = 1.0;
     double max_ang_acc_ = 1.0;
 
+    double umap_request_period_ = 0.1;
+    double umap_localization_delay_ = 0.0;
+
     Eigen::Vector3d target_vel_;
     Eigen::Vector3d truth_vel_;
     Eigen::Vector3d truth_pos_;
     Eigen::Vector3d current_pos_;
     Eigen::Vector3d current_vel_;
+
+    Eigen::Vector3d odom_vel_;
+    Eigen::Vector3d odom_pos_;
+
+    std::optional<rclcpp::Time> umap_request_time_ = std::nullopt;
+    Eigen::Vector3d umap_pos_;
+    Eigen::Vector3d umap_odom_pos_;
 
 public:
     Simulator(const rclcpp::NodeOptions& options) : Simulator("", options) {}
@@ -69,6 +79,21 @@ public:
         static std::normal_distribution<> vel_y_dist(get_parameter("vel_y_mean").as_double(), get_parameter("vel_y_stddev").as_double());
         static std::normal_distribution<> vel_th_dist(get_parameter("vel_yaw_mean").as_double(), get_parameter("vel_yaw_stddev").as_double());
 
+        declare_parameter<double>("umap_request_period", 0.1);
+        umap_request_period_ = get_parameter("umap_request_period").as_double();
+        declare_parameter<double>("umap_localization_delay", 0.0);
+        umap_localization_delay_ = get_parameter("umap_localization_delay").as_double();
+
+        declare_parameter<double>("umap_pos_x_mean", 0.0);
+        declare_parameter<double>("umap_pos_x_stddev", 0.01);
+        declare_parameter<double>("umap_pos_y_mean", 0.0);
+        declare_parameter<double>("umap_pos_y_stddev", 0.01);
+        declare_parameter<double>("umap_pos_yaw_mean", 0.0);
+        declare_parameter<double>("umap_pos_yaw_stddev", 0.01);
+        static std::normal_distribution<> umap_pos_x_dist(get_parameter("umap_pos_x_mean").as_double(), get_parameter("umap_pos_x_stddev").as_double());
+        static std::normal_distribution<> umap_pos_y_dist(get_parameter("umap_pos_y_mean").as_double(), get_parameter("umap_pos_y_stddev").as_double());
+        static std::normal_distribution<> umap_pos_th_dist(get_parameter("umap_pos_yaw_mean").as_double(), get_parameter("umap_pos_yaw_stddev").as_double());
+
         static ClampVelLimitFilter vx_filter(-max_vel_, max_vel_, max_acc_, dt_);
         static ClampVelLimitFilter vy_filter(-max_vel_, max_vel_, max_acc_, dt_);
         static ClampVelLimitFilter vth_filter(-max_ang_vel_, max_ang_vel_, max_ang_acc_, dt_);
@@ -78,8 +103,10 @@ public:
 
         static auto truth_vel_pub = create_publisher<geometry_msgs::msg::TwistStamped>("truth_vel", rclcpp::QoS(10).reliable());
         static auto truth_pos_pub = create_publisher<geometry_msgs::msg::PoseStamped>("truth_pos", rclcpp::QoS(10).reliable());
-        static auto current_vel_pub = create_publisher<geometry_msgs::msg::TwistStamped>("current_vel", rclcpp::QoS(10).reliable());
-        static auto current_pos_pub = create_publisher<geometry_msgs::msg::PoseStamped>("current_pos", rclcpp::QoS(10).reliable());
+        static auto odom_vel_pub = create_publisher<geometry_msgs::msg::TwistStamped>("odom_vel", rclcpp::QoS(10).reliable());
+        static auto odom_pos_pub = create_publisher<geometry_msgs::msg::PoseStamped>("odom_pos", rclcpp::QoS(10).reliable());
+
+        static auto umap_pos_pub = create_publisher<geometry_msgs::msg::PoseStamped>("umap_pos", rclcpp::QoS(10).reliable());
 
         static auto target_vel_sub = create_subscription<geometry_msgs::msg::TwistStamped>("target_vel", rclcpp::QoS(10).reliable(), [&](const geometry_msgs::msg::TwistStamped::SharedPtr msg) {
             vx_filter.set_input(msg->twist.linear.x);
@@ -87,12 +114,38 @@ public:
             vth_filter.set_input(msg->twist.angular.z);
         });
 
+        static auto odom_vel_sub = create_subscription<geometry_msgs::msg::TwistStamped>("odom_vel", rclcpp::QoS(10).reliable(), [&](const geometry_msgs::msg::TwistStamped::SharedPtr msg) { odom_vel_ = make_eigen_vector3d(msg->twist); });
+        static auto odom_pos_sub = create_subscription<geometry_msgs::msg::PoseStamped>("odom_pos", rclcpp::QoS(10).reliable(), [&](const geometry_msgs::msg::PoseStamped::SharedPtr msg) { odom_pos_ = make_eigen_vector3d(msg->pose); });
+
+        static auto umap_sim_timer = create_wall_timer(1s * umap_request_period_, [&]() {
+            umap_odom_pos_ = odom_pos_;
+            umap_pos_ = truth_pos_;
+            umap_pos_.x() += umap_pos_x_dist(engine);
+            umap_pos_.y() += umap_pos_y_dist(engine);
+            umap_pos_.z() += umap_pos_th_dist(engine);
+
+            umap_request_time_ = this->get_clock()->now();
+        });
+
         static auto timer = create_wall_timer(1s * dt_, [&]() {
+            if (umap_request_time_ && this->get_clock()->now().seconds() - umap_request_time_.value().seconds() > umap_localization_delay_) {
+                auto odom_diff = odom_pos_ - umap_odom_pos_;
+                umap_pos_.head<2>() += rotate_2d(odom_diff.head<2>(), umap_pos_.z());
+                umap_pos_.z() += odom_diff.z();
+
+                geometry_msgs::msg::PoseStamped umap_pos_msg;
+                umap_pos_msg.header.frame_id = "map";
+                umap_pos_msg.header.stamp = this->get_clock()->now();
+                umap_pos_msg.pose = make_pose(umap_pos_);
+                umap_pos_pub->publish(umap_pos_msg);
+
+                umap_request_time_ = std::nullopt;
+            }
             {
                 truth_vel_.x() = vx_filter.filtering();
                 truth_vel_.y() = vy_filter.filtering();
                 truth_vel_.z() = vth_filter.filtering();
-                auto rotate_vel = rotate_2d(current_vel_.head<2>(), truth_pos_.z());
+                auto rotate_vel = rotate_2d(truth_vel_.head<2>(), truth_pos_.z());
                 truth_pos_.x() += rotate_vel.x() * dt_;
                 truth_pos_.y() += rotate_vel.y() * dt_;
                 truth_pos_.z() += truth_vel_.z() * dt_;
@@ -101,8 +154,7 @@ public:
                 geometry_msgs::msg::TwistStamped truth_vel_msg;
                 truth_vel_msg.header.frame_id = "map";
                 truth_vel_msg.header.stamp = this->get_clock()->now();
-                auto rotate_vel = rotate_2d(truth_vel_.head<2>(), truth_pos_.z());
-                truth_vel_msg.twist = make_twist(rotate_vel.x(), rotate_vel.y(), truth_vel_.z());
+                truth_vel_msg.twist = make_twist(truth_vel_);
                 truth_vel_pub->publish(truth_vel_msg);
             }
             {
@@ -122,19 +174,18 @@ public:
                 current_pos_.z() += current_vel_.z() * dt_;
             }
             {
-                geometry_msgs::msg::TwistStamped current_vel_msg;
-                current_vel_msg.header.frame_id = "map";
-                current_vel_msg.header.stamp = this->get_clock()->now();
-                auto rotate_vel = rotate_2d(current_vel_.head<2>(), current_pos_.z());
-                current_vel_msg.twist = make_twist(rotate_vel.x(), rotate_vel.y(), current_vel_.z());
-                current_vel_pub->publish(current_vel_msg);
+                geometry_msgs::msg::TwistStamped odom_vel_msg;
+                odom_vel_msg.header.frame_id = "map";
+                odom_vel_msg.header.stamp = this->get_clock()->now();
+                odom_vel_msg.twist = make_twist(current_vel_);
+                odom_vel_pub->publish(odom_vel_msg);
             }
             {
-                geometry_msgs::msg::PoseStamped current_pos_msg;
-                current_pos_msg.header.frame_id = "map";
-                current_pos_msg.header.stamp = this->get_clock()->now();
-                current_pos_msg.pose = make_pose(current_pos_);
-                current_pos_pub->publish(current_pos_msg);
+                geometry_msgs::msg::PoseStamped odom_pos_msg;
+                odom_pos_msg.header.frame_id = "map";
+                odom_pos_msg.header.stamp = this->get_clock()->now();
+                odom_pos_msg.pose = make_pose(current_pos_);
+                odom_pos_pub->publish(odom_pos_msg);
             }
         });
     }

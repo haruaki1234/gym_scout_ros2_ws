@@ -296,22 +296,21 @@ private:
         auto rotate_vel = rotate_2d(current_vel_.head<2>(), -current_pos_.z());
         double range_min_x = std::max(rotate_vel.x() - max_acc_ * control_period_, -max_vel_);
         double range_max_x = std::min(rotate_vel.x() + max_acc_ * control_period_, max_vel_);
-        // double range_min_y = std::max(rotate_vel.y() - max_acc_ * control_period_, -max_vel_);
-        // double range_max_y = std::min(rotate_vel.y() + max_acc_ * control_period_, max_vel_);
+        double range_min_y = std::max(rotate_vel.y() - max_acc_ * control_period_, -max_vel_);
+        double range_max_y = std::min(rotate_vel.y() + max_acc_ * control_period_, max_vel_);
         double range_min_z = std::max(current_vel_.z() - max_angle_acc_ * control_period_, -max_angle_vel_);
         double range_max_z = std::min(current_vel_.z() + max_angle_acc_ * control_period_, max_angle_vel_);
 
         std::vector<local_path_data_t> choices_path;
         for (int i = 0; i <= vel_split_num_; i++) {
             double x = range_min_x + (range_max_x - range_min_x) / vel_split_num_ * i;
-            // for (int j = 0; j <= vel_split_num_; j++) {
-            // double y = range_min_y + (range_max_y - range_min_y) / vel_split_num_ * j;
-            double y = 0;
-            for (int k = 0; k <= vel_split_num_; k++) {
-                double z = range_min_z + (range_max_z - range_min_z) / vel_split_num_ * k;
-                choices_path.push_back(local_path_data_t(Eigen::Vector3d(x, y, z), simulation_pos(Eigen::Vector3d(x, y, z), current_pos_)));
+            for (int j = 0; j <= vel_split_num_; j++) {
+                double y = range_min_y + (range_max_y - range_min_y) / vel_split_num_ * j;
+                for (int k = 0; k <= vel_split_num_; k++) {
+                    double z = range_min_z + (range_max_z - range_min_z) / vel_split_num_ * k;
+                    choices_path.push_back(local_path_data_t(Eigen::Vector3d(x, y, z), simulation_pos(Eigen::Vector3d(x, y, z), current_pos_)));
+                }
             }
-            // }
         }
         return choices_path;
     }

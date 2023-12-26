@@ -5,12 +5,20 @@ simulator_node:
     max_acc: 5.0
     max_ang_vel: 5.0
     max_ang_acc: 5.0
-    init_x: 2.0
-    init_y: 2.0
+    init_x: 1.0
+    init_y: 1.0
     init_yaw: 0.0
-    vel_x_mean: 0.9
+    vel_x_mean: 0.98
     vel_x_stddev: 0.05
-    vel_y_mean: 0.9
+    vel_y_mean: 0.98
     vel_y_stddev: 0.05
     vel_yaw_mean: 1.0
     vel_yaw_stddev: 0.05
+    umap_request_period: 1.0
+    umap_localization_delay: 0.5
+    umap_pos_x_mean: 0.0
+    umap_pos_x_stddev: 0.5
+    umap_pos_y_mean: 0.0
+    umap_pos_y_stddev: 0.5
+    umap_yaw_mean: 0.0
+    umap_yaw_stddev: 0.5
