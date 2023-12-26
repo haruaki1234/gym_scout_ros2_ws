@@ -130,7 +130,7 @@ public:
         static auto timer = create_wall_timer(1s * dt_, [&]() {
             if (umap_request_time_ && this->get_clock()->now().seconds() - umap_request_time_.value().seconds() > umap_localization_delay_) {
                 auto odom_diff = odom_pos_ - umap_odom_pos_;
-                umap_pos_.head<2>() += rotate_2d(odom_diff.head<2>(), umap_pos_.z());
+                umap_pos_.head<2>() += rotate_2d(odom_diff.head<2>(), umap_pos_.z() - umap_odom_pos_.z());
                 umap_pos_.z() += odom_diff.z();
 
                 geometry_msgs::msg::PoseStamped umap_pos_msg;
