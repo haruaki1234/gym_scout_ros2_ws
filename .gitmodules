@@ -1,0 +1,3 @@
+[submodule "src/umap_client/include/asio"]
+	path = src/umap_client/include/asio
+	url = https://github.com/chriskohlhoff/asio.git
