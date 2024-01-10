@@ -1,3 +1,9 @@
 [submodule "src/umap_client/include/asio"]
 	path = src/umap_client/include/asio
 	url = https://github.com/chriskohlhoff/asio.git
+[submodule "src/scout_ros2"]
+	path = src/scout_ros2
+	url = https://github.com/agilexrobotics/scout_ros2.git
+[submodule "src/ugv_sdk"]
+	path = src/ugv_sdk
+	url = https://github.com/westonrobot/ugv_sdk.git
