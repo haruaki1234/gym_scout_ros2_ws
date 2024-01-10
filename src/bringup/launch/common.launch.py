@@ -50,6 +50,14 @@ def generate_launch_description():
         ),
 
         Node(
+            package='robot_state_publisher',
+            executable='robot_state_publisher',
+            output='screen',
+            arguments=[os.path.join(pkg_dir, 'urdf', 'scout_v2.urdf')],
+            respawn = True
+        ),
+
+        Node(
             package='rviz2',
             executable='rviz2',
             arguments=['-d', os.path.join(pkg_dir, "config", "rviz_config.rviz")]

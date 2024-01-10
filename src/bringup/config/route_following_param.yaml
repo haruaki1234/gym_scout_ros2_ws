@@ -8,7 +8,7 @@ route_following_node:
     vel_split_num: 3
     simulation_time: 1.0
     simulation_step: 10
-    collision_map_distance: 0.5
+    collision_map_distance: 0.7
     ignore_map_distance: 1.0
     score_local_target_distance_waight: 1.0
     score_local_target_angle_waight: 0.5
