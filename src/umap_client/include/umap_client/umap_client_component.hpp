@@ -20,9 +20,13 @@ public:
         declare_parameter("period", 0.01);
         period_ = get_parameter("period").as_double();
 
-        static umap::UmapImageSender umap_image_sender("192.168.11.1", 8080, "TB01", 1);
+        static umap::UmapImageSender umap_image_sender("192.168.11.8", 50000, "TB01", 1);
 
-        static auto timer = create_wall_timer(1s * period_, [&]() { RCLCPP_INFO(this->get_logger(), "Hello, world!"); });
+        static auto timer = create_wall_timer(1s * period_, [&]() {
+            cv::Mat img = cv::imread("src/bringup/config/IMG_1582.png", 0);
+            RCLCPP_INFO(this->get_logger(), "send");
+            umap_image_sender.send_from_mat(img, umap::UmapImageSender::pose_t(), -1);
+        });
     }
 };
 

@@ -1,0 +1,3 @@
+umap_client_node:
+  ros__parameters:
+    period: 2.0

@@ -18,6 +18,15 @@ from launch_ros.descriptions import ComposableNode
 def generate_launch_description():
     pkg_dir = get_package_share_directory("bringup")
     list = [
+        Node(
+            package='umap_client',
+            executable='umap_client',
+            output='screen',
+            parameters=[
+                os.path.join(pkg_dir, "config", "umap_client_param.yaml")
+            ],
+            respawn = True
+        ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 [os.path.join(pkg_dir, 'launch', 'common.launch.py')]

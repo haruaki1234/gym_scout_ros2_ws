@@ -29,7 +29,7 @@ public:
         float similar_average;
         float similar_variance;
     };
-    enum class LineDetectionType { NONE, CANNY, LSD, FLD };
+    enum class LineDetectionType { CANNY, LSD, FLD };
 
 private:
     std::string address_ = "";
@@ -38,8 +38,9 @@ private:
     std::string device_id_ = "";
     int camera_number_ = 0;
     bool is_calibrated_ = true;
-    bool is_resized_ = false;
-    LineDetectionType line_detection_type_ = LineDetectionType::NONE;
+    bool is_resized_ = true;
+    bool is_line_detected_ = true;
+    LineDetectionType line_detection_type_ = LineDetectionType::CANNY;
     asio::io_context io_context_;
 
     std::string make_file_name() const
@@ -55,7 +56,7 @@ private:
         auto time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
         auto time_info = std::localtime(&time);
         int year = time_info->tm_year + 1900;
-        file_name << std::setw(2) << std::setfill('0') << std::to_string(year % (year / 1000) * 1000);
+        file_name << std::setw(2) << std::setfill('0') << std::to_string(year % ((year / 1000) * 1000));
         file_name << std::setw(2) << std::setfill('0') << std::to_string(time_info->tm_mon + 1);
         file_name << std::setw(2) << std::setfill('0') << std::to_string(time_info->tm_mday);
         file_name << std::setw(2) << std::setfill('0') << std::to_string(time_info->tm_hour);
@@ -76,19 +77,31 @@ private:
         else {
             process_histry += "R";
         }
-        switch (line_detection_type_) {
-        case LineDetectionType::CANNY:
-            process_histry += "n";
-            break;
-        case LineDetectionType::LSD:
-            process_histry += "l";
-            break;
-        case LineDetectionType::FLD:
-            process_histry += "f";
-            break;
-        case LineDetectionType::NONE:
-            process_histry += "N";
-            break;
+        if (is_line_detected_) {
+            switch (line_detection_type_) {
+            case LineDetectionType::CANNY:
+                process_histry += "n";
+                break;
+            case LineDetectionType::LSD:
+                process_histry += "l";
+                break;
+            case LineDetectionType::FLD:
+                process_histry += "f";
+                break;
+            }
+        }
+        else {
+            switch (line_detection_type_) {
+            case LineDetectionType::CANNY:
+                process_histry += "N";
+                break;
+            case LineDetectionType::LSD:
+                process_histry += "L";
+                break;
+            case LineDetectionType::FLD:
+                process_histry += "F";
+                break;
+            }
         }
         file_name << std::setw(8) << std::setfill('0') << process_histry;
         file_name << ".png";
@@ -146,15 +159,15 @@ public:
     UmapImageSender(const std::string& address, int port, const std::string& device_id, int camera_number) : address_(address), port_(port), device_id_(device_id), camera_number_(camera_number) {}
     std::optional<result_t> send_from_mat(const cv::Mat& img, const pose_t& pose, float matching_distance)
     {
-        std::vector<int> param(2);
-        param[0] = cv::IMWRITE_PNG_COMPRESSION;
-        param[1] = 3;
+        auto file_name = make_file_name();
+        std::vector<uint8_t> file_name_binary(file_name.begin(), file_name.end());
         std::vector<uint8_t> img_binary;
-        cv::imencode(".png", img, img_binary, param);
+        cv::imencode(".png", img, img_binary);
         std::array<float, 7> float_array = {pose.x, pose.y, pose.z, pose.roll, pose.pitch, pose.yaw, matching_distance};
-        std::vector<uint8_t> float_binary(7);
+        std::vector<uint8_t> float_binary(sizeof(float) * 7);
         std::memcpy(float_binary.data(), float_array.data(), sizeof(float) * 7);
         std::vector<uint8_t> binary;
+        binary.insert(binary.end(), file_name_binary.begin(), file_name_binary.end());
         binary.insert(binary.end(), img_binary.begin(), img_binary.end());
         binary.insert(binary.end(), float_binary.begin(), float_binary.end());
         send_binary(binary);
