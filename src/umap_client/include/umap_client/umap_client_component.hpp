@@ -20,7 +20,12 @@ public:
         declare_parameter("period", 0.01);
         period_ = get_parameter("period").as_double();
 
-        static umap::UmapImageSender umap_image_sender("192.168.11.8", 50000, "TB01", 1);
+        declare_parameter("server_ip", "192.168.11.8");
+        declare_parameter("server_port", 50000);
+        declare_parameter("device_id", "TB01");
+        declare_parameter("camera_number", 1);
+
+        static umap::UmapImageSender umap_image_sender(get_parameter("server_ip").as_string(), get_parameter("server_port").as_int(), get_parameter("device_id").as_string(), get_parameter("camera_number").as_int());
         umap_image_sender.is_return = false;
 
         static auto timer = create_wall_timer(1s * period_, [&]() {
