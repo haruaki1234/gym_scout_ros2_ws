@@ -8,6 +8,7 @@
 #include <nav_msgs/msg/grid_cells.hpp>
 #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
+#include <nav_msgs/msg/odometry.hpp>
 #include <tf2/utils.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
@@ -84,7 +85,7 @@ public:
         grid_msg_.cell_height = resolution_;
         grid_pub->publish(grid_msg_);
 
-        static auto current_pos_sub = create_subscription<geometry_msgs::msg::PoseStamped>("current_pos", rclcpp::QoS(10).reliable(), [&](const geometry_msgs::msg::PoseStamped::SharedPtr msg) { current_pos_ = make_eigen_vector3d(msg->pose); });
+        static auto localization_sub = create_subscription<nav_msgs::msg::Odometry>("localization", rclcpp::QoS(10).reliable(), [&](const nav_msgs::msg::Odometry::SharedPtr msg) { current_pos_ = make_eigen_vector3d(msg->pose.pose); });
 
         static auto goal_sub = this->create_subscription<geometry_msgs::msg::PoseStamped>("goal_pose", rclcpp::QoS(10).reliable(), [&](const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
             auto goal = to_grid(Eigen::Vector2d(msg->pose.position.x, msg->pose.position.y));

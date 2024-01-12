@@ -5,6 +5,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <geometry_msgs/msg/twist_stamped.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
+#include <nav_msgs/msg/odometry.hpp>
 
 #include <Eigen/Dense>
 
@@ -101,10 +102,8 @@ public:
         vy_filter.reset(0);
         vth_filter.reset(0);
 
-        static auto truth_vel_pub = create_publisher<geometry_msgs::msg::TwistStamped>("truth_vel", rclcpp::QoS(10).reliable());
-        static auto truth_pos_pub = create_publisher<geometry_msgs::msg::PoseStamped>("truth_pos", rclcpp::QoS(10).reliable());
-        static auto odom_vel_pub = create_publisher<geometry_msgs::msg::TwistStamped>("odom_vel", rclcpp::QoS(10).reliable());
-        static auto odom_pos_pub = create_publisher<geometry_msgs::msg::PoseStamped>("odom_pos", rclcpp::QoS(10).reliable());
+        static auto truth_odom_pub = create_publisher<nav_msgs::msg::Odometry>("truth_odom", rclcpp::QoS(10).reliable());
+        static auto odom_pub = create_publisher<nav_msgs::msg::Odometry>("odom", rclcpp::QoS(10).reliable());
 
         static auto umap_pos_pub = create_publisher<geometry_msgs::msg::PoseStamped>("umap_pos", rclcpp::QoS(10).reliable());
 
@@ -114,8 +113,10 @@ public:
             vth_filter.set_input(msg->twist.angular.z);
         });
 
-        static auto odom_vel_sub = create_subscription<geometry_msgs::msg::TwistStamped>("odom_vel", rclcpp::QoS(10).reliable(), [&](const geometry_msgs::msg::TwistStamped::SharedPtr msg) { odom_vel_ = make_eigen_vector3d(msg->twist); });
-        static auto odom_pos_sub = create_subscription<geometry_msgs::msg::PoseStamped>("odom_pos", rclcpp::QoS(10).reliable(), [&](const geometry_msgs::msg::PoseStamped::SharedPtr msg) { odom_pos_ = make_eigen_vector3d(msg->pose); });
+        static auto odom_sub = create_subscription<nav_msgs::msg::Odometry>("odom", rclcpp::QoS(10).reliable(), [&](const nav_msgs::msg::Odometry::SharedPtr msg) {
+            odom_pos_ = make_eigen_vector3d(msg->pose.pose);
+            odom_vel_ = make_eigen_vector3d(msg->twist.twist);
+        });
 
         static auto umap_sim_timer = create_wall_timer(1s * umap_request_period_, [&]() {
             umap_odom_pos_ = odom_pos_;
@@ -151,18 +152,12 @@ public:
                 truth_pos_.z() += truth_vel_.z() * dt_;
             }
             {
-                geometry_msgs::msg::TwistStamped truth_vel_msg;
-                truth_vel_msg.header.frame_id = "map";
-                truth_vel_msg.header.stamp = this->get_clock()->now();
-                truth_vel_msg.twist = make_twist(truth_vel_);
-                truth_vel_pub->publish(truth_vel_msg);
-            }
-            {
-                geometry_msgs::msg::PoseStamped truth_pos_msg;
-                truth_pos_msg.header.frame_id = "map";
-                truth_pos_msg.header.stamp = this->get_clock()->now();
-                truth_pos_msg.pose = make_pose(truth_pos_);
-                truth_pos_pub->publish(truth_pos_msg);
+                nav_msgs::msg::Odometry truth_odom_msg;
+                truth_odom_msg.header.frame_id = "map";
+                truth_odom_msg.header.stamp = this->get_clock()->now();
+                truth_odom_msg.pose.pose = make_pose(truth_pos_);
+                truth_odom_msg.twist.twist = make_twist(truth_vel_);
+                truth_odom_pub->publish(truth_odom_msg);
             }
             {
                 current_vel_.x() = truth_vel_.x() * vel_x_dist(engine);
@@ -174,18 +169,12 @@ public:
                 current_pos_.z() += current_vel_.z() * dt_;
             }
             {
-                geometry_msgs::msg::TwistStamped odom_vel_msg;
-                odom_vel_msg.header.frame_id = "map";
-                odom_vel_msg.header.stamp = this->get_clock()->now();
-                odom_vel_msg.twist = make_twist(current_vel_);
-                odom_vel_pub->publish(odom_vel_msg);
-            }
-            {
-                geometry_msgs::msg::PoseStamped odom_pos_msg;
-                odom_pos_msg.header.frame_id = "map";
-                odom_pos_msg.header.stamp = this->get_clock()->now();
-                odom_pos_msg.pose = make_pose(current_pos_);
-                odom_pos_pub->publish(odom_pos_msg);
+                nav_msgs::msg::Odometry odom_msg;
+                odom_msg.header.frame_id = "map";
+                odom_msg.header.stamp = this->get_clock()->now();
+                odom_msg.pose.pose = make_pose(current_pos_);
+                odom_msg.twist.twist = make_twist(current_vel_);
+                odom_pub->publish(odom_msg);
             }
         });
     }

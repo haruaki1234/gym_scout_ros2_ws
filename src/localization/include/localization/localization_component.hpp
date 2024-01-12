@@ -10,6 +10,7 @@
 
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "geometry_msgs/msg/twist_stamped.hpp"
+#include "nav_msgs/msg/odometry.hpp"
 #include "utils/utils.hpp"
 #include "utils/kalman_filter.hpp"
 
@@ -67,11 +68,12 @@ public:
             reference_grid_point_.y() = std::floor(init_pos.y() / GRID_WIDTH + 0.5) * GRID_WIDTH;
         };
 
-        static auto current_vel_pub = this->create_publisher<geometry_msgs::msg::TwistStamped>("current_vel", rclcpp::QoS(10).reliable());
-        static auto current_pos_pub = this->create_publisher<geometry_msgs::msg::PoseStamped>("current_pos", rclcpp::QoS(10).reliable());
+        static auto localization_pub = this->create_publisher<nav_msgs::msg::Odometry>("localization", rclcpp::QoS(10).reliable());
 
-        static auto odometer_vel_sub = this->create_subscription<geometry_msgs::msg::TwistStamped>("odom_vel", rclcpp::QoS(10).reliable(), [&](const geometry_msgs::msg::TwistStamped::SharedPtr msg) { odometer_vel_ = make_eigen_vector3d(msg->twist); });
-        static auto odometer_pos_sub = this->create_subscription<geometry_msgs::msg::PoseStamped>("odom_pos", rclcpp::QoS(10).reliable(), [&](const geometry_msgs::msg::PoseStamped::SharedPtr msg) { odometer_pos_ = make_eigen_vector3d(msg->pose); });
+        static auto odom_sub = this->create_subscription<nav_msgs::msg::Odometry>("odom", rclcpp::QoS(10).reliable(), [&](const nav_msgs::msg::Odometry::SharedPtr msg) {
+            odometer_pos_ = make_eigen_vector3d(msg->pose.pose);
+            odometer_vel_ = make_eigen_vector3d(msg->twist.twist);
+        });
 
         set_position(Eigen::Vector3d(initial_pos[0], initial_pos[1], initial_pos[2]));
 
@@ -133,17 +135,12 @@ public:
 
             estimate_pos_ = klf_.filtering(estimate_vel_, estimate_pos_);
 
-            geometry_msgs::msg::TwistStamped current_vel_msg;
-            current_vel_msg.header.frame_id = "map";
-            current_vel_msg.header.stamp = this->get_clock()->now();
-            current_vel_msg.twist = make_twist(estimate_vel_);
-            current_vel_pub->publish(current_vel_msg);
-
-            geometry_msgs::msg::PoseStamped current_pos_msg;
-            current_pos_msg.header.frame_id = "map";
-            current_pos_msg.header.stamp = this->get_clock()->now();
-            current_pos_msg.pose = make_pose(estimate_pos_);
-            current_pos_pub->publish(current_pos_msg);
+            nav_msgs::msg::Odometry localization_msg;
+            localization_msg.header.frame_id = "map";
+            localization_msg.header.stamp = this->get_clock()->now();
+            localization_msg.pose.pose = make_pose(estimate_pos_);
+            localization_msg.twist.twist = make_twist(estimate_vel_);
+            localization_pub->publish(localization_msg);
 
             geometry_msgs::msg::TransformStamped transform_stamped;
             transform_stamped.header.stamp = this->get_clock()->now();

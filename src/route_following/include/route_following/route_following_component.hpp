@@ -8,6 +8,7 @@
 #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
 #include <geometry_msgs/msg/twist_stamped.hpp>
 #include <geometry_msgs/msg/quaternion.hpp>
+#include <nav_msgs/msg/odometry.hpp>
 #include <tf2/utils.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
@@ -162,8 +163,10 @@ public:
         static auto local_path_pub = create_publisher<nav_msgs::msg::Path>("local_path", rclcpp::QoS(10).reliable());
         static auto local_target_pos_pub = create_publisher<geometry_msgs::msg::PoseStamped>("local_target_pos", rclcpp::QoS(10).reliable());
 
-        static auto current_vel_sub = create_subscription<geometry_msgs::msg::TwistStamped>("current_vel", rclcpp::QoS(10).reliable(), [&](const geometry_msgs::msg::TwistStamped::SharedPtr msg) { current_vel_ = make_eigen_vector3d(msg->twist); });
-        static auto current_pos_sub = create_subscription<geometry_msgs::msg::PoseStamped>("current_pos", rclcpp::QoS(10).reliable(), [&](const geometry_msgs::msg::PoseStamped::SharedPtr msg) { current_pos_ = make_eigen_vector3d(msg->pose); });
+        static auto localization_sub = create_subscription<nav_msgs::msg::Odometry>("localization", rclcpp::QoS(10).reliable(), [&](const nav_msgs::msg::Odometry::SharedPtr msg) {
+            current_pos_ = make_eigen_vector3d(msg->pose.pose);
+            current_vel_ = make_eigen_vector3d(msg->twist.twist);
+        });
         static auto global_path_sub = create_subscription<nav_msgs::msg::Path>("global_path", rclcpp::QoS(10).reliable(), [&](const nav_msgs::msg::Path::SharedPtr msg) {
             global_path_ = msg->poses;
             near_index_ = 0;
