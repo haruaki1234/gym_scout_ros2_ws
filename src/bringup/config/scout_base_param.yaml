@@ -1,4 +1,4 @@
-scout_base_node:
+scout:
   ros__parameters:
     use_sim_time: false
     port_name: can0

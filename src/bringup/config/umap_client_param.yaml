@@ -5,3 +5,8 @@ umap_client_node:
     server_port: 50000
     device_id: TB01
     camera_number: 1
+    resize_width: 320
+    resize_height: 240
+    canny_threshould1: 50.0
+    canny_threshould2: 110.0
+    umap_matching_distance: 2.0
