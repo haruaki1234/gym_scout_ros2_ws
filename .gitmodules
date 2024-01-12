@@ -4,3 +4,6 @@
 [submodule "src/ugv_sdk"]
 	path = src/ugv_sdk
 	url = https://github.com/westonrobot/ugv_sdk.git
+[submodule "src/scout_ros2"]
+	path = src/scout_ros2
+	url = https://github.com/tlab-tut/scout_ros2.git
