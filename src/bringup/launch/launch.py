@@ -24,8 +24,7 @@ def generate_launch_description():
             output='screen',
             parameters=[
                 os.path.join(pkg_dir, "config", "umap_client_param.yaml")
-            ],
-            respawn = True
+            ]
         ),
         Node(
             package='scout_base',
@@ -33,8 +32,7 @@ def generate_launch_description():
             output='screen',
             parameters=[
                 os.path.join(pkg_dir, "config", "scout_base_param.yaml")
-            ],
-            respawn = True
+            ]
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(

@@ -25,8 +25,7 @@ def generate_launch_description():
             output='screen',
             parameters=[
                 os.path.join(pkg_dir, "config", "global_path_planner_param.yaml")
-            ],
-            respawn = True
+            ]
         ),
         
         Node(
@@ -35,8 +34,7 @@ def generate_launch_description():
             output='screen',
             parameters=[
                 os.path.join(pkg_dir, "config", "route_following_param.yaml")
-            ],
-            respawn = True
+            ]
         ),
 
         Node(
@@ -45,16 +43,14 @@ def generate_launch_description():
             output='screen',
             parameters=[
                 os.path.join(pkg_dir, "config", "localization_param.yaml")
-            ],
-            respawn = True
+            ]
         ),
 
         Node(
             package='robot_state_publisher',
             executable='robot_state_publisher',
             output='screen',
-            arguments=[os.path.join(get_package_share_directory("scout_description"), "urdf", "scout_mini.urdf")],
-            respawn = True
+            arguments=[os.path.join(get_package_share_directory("scout_description"), "urdf", "scout_mini.urdf")]
         ),
 
         Node(
@@ -63,11 +59,11 @@ def generate_launch_description():
             arguments=['-d', os.path.join(pkg_dir, "config", "rviz_config.rviz")]
         ),
 
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                [os.path.join(pkg_dir, 'launch', 'static_tf.launch.py')]
-            )
-        ),
+        # IncludeLaunchDescription(
+        #     PythonLaunchDescriptionSource(
+        #         [os.path.join(pkg_dir, 'launch', 'static_tf.launch.py')]
+        #     )
+        # ),
     ]
 
     return LaunchDescription(list)

@@ -24,8 +24,7 @@ def generate_launch_description():
             output='screen',
             parameters=[
                 os.path.join(pkg_dir, "config", "simulator_param.yaml")
-            ],
-            respawn = True
+            ]
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(

@@ -31,22 +31,23 @@ public:
     };
     enum class LineDetectionType { CANNY, LSD, FLD };
 
+    bool is_return = true;
+    bool is_calibrated = true;
+    bool is_resized = true;
+    bool is_line_detected = true;
+    LineDetectionType line_detection_type = LineDetectionType::CANNY;
+
 private:
     std::string address_ = "";
     int port_ = 0;
-    bool is_return_ = true;
     std::string device_id_ = "";
     int camera_number_ = 0;
-    bool is_calibrated_ = true;
-    bool is_resized_ = true;
-    bool is_line_detected_ = true;
-    LineDetectionType line_detection_type_ = LineDetectionType::CANNY;
     asio::io_context io_context_;
 
     std::string make_file_name() const
     {
         std::stringstream file_name;
-        if (is_return_) {
+        if (is_return) {
             file_name << "T";
         }
         else {
@@ -65,20 +66,20 @@ private:
         file_name << std::setw(4) << std::setfill('0') << device_id_;
         file_name << std::setw(2) << std::setfill('0') << std::to_string(camera_number_);
         std::string process_histry = "";
-        if (is_calibrated_) {
+        if (is_calibrated) {
             process_histry += "c";
         }
         else {
             process_histry += "C";
         }
-        if (is_resized_) {
+        if (is_resized) {
             process_histry += "r";
         }
         else {
             process_histry += "R";
         }
-        if (is_line_detected_) {
-            switch (line_detection_type_) {
+        if (is_line_detected) {
+            switch (line_detection_type) {
             case LineDetectionType::CANNY:
                 process_histry += "n";
                 break;
@@ -91,7 +92,7 @@ private:
             }
         }
         else {
-            switch (line_detection_type_) {
+            switch (line_detection_type) {
             case LineDetectionType::CANNY:
                 process_histry += "N";
                 break;
@@ -171,7 +172,7 @@ public:
         binary.insert(binary.end(), img_binary.begin(), img_binary.end());
         binary.insert(binary.end(), float_binary.begin(), float_binary.end());
         send_binary(binary);
-        if (is_return_) {
+        if (is_return) {
             return receive();
         }
         else {
