@@ -27,6 +27,15 @@ def generate_launch_description():
             ],
             respawn = True
         ),
+        Node(
+            package='scout_base',
+            executable='scout_base_node',
+            output='screen',
+            parameters=[
+                os.path.join(pkg_dir, "config", "scout_base_param.yaml")
+            ],
+            respawn = True
+        ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 [os.path.join(pkg_dir, 'launch', 'common.launch.py')]

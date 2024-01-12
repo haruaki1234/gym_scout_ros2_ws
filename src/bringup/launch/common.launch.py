@@ -53,7 +53,7 @@ def generate_launch_description():
             package='robot_state_publisher',
             executable='robot_state_publisher',
             output='screen',
-            arguments=[os.path.join(pkg_dir, 'urdf', 'scout_v2.urdf')],
+            arguments=[os.path.join(get_package_share_directory("scout_description"), "urdf", "scout_mini.urdf")],
             respawn = True
         ),
 
