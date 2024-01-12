@@ -163,7 +163,7 @@ public:
         scores_.push_back(Score(score_map_distance_waight_, [&](const local_path_data_t& path) { return calc_score_map_distance(path); }));
         scores_.push_back(Score(score_integral_error_waight_, [&](const local_path_data_t& path) { return calc_score_integral_error(path); }));
 
-        static auto velocity_pub = create_publisher<geometry_msgs::msg::TwistStamped>("target_vel", rclcpp::QoS(10).reliable());
+        static auto velocity_pub = create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 5);
         static auto candidate_path_pub = create_publisher<nav_msgs::msg::Path>("local_path_candidate", rclcpp::QoS(10).reliable());
         static auto local_path_pub = create_publisher<nav_msgs::msg::Path>("local_path", rclcpp::QoS(10).reliable());
         static auto local_target_pos_pub = create_publisher<geometry_msgs::msg::PoseStamped>("local_target_pos", rclcpp::QoS(10).reliable());
@@ -205,12 +205,10 @@ public:
 
         static auto timer = create_wall_timer(1s * control_period_, [&]() {
             if (global_path_.empty()) {
-                geometry_msgs::msg::TwistStamped vel_msg;
-                vel_msg.header.frame_id = "map";
-                vel_msg.header.stamp = this->get_clock()->now();
-                vel_msg.twist.linear.x = 0;
-                vel_msg.twist.linear.y = 0;
-                vel_msg.twist.angular.z = 0;
+                geometry_msgs::msg::Twist vel_msg;
+                vel_msg.linear.x = 0;
+                vel_msg.linear.y = 0;
+                vel_msg.angular.z = 0;
                 velocity_pub->publish(vel_msg);
                 return;
             }
@@ -247,12 +245,10 @@ public:
 
             if (auto goal_pos = make_eigen_vector3d(global_path_.back().pose); (goal_pos - current_pos_).head<2>().norm() < goal_distance_) {
                 global_path_.clear();
-                geometry_msgs::msg::TwistStamped vel_msg;
-                vel_msg.header.frame_id = "map";
-                vel_msg.header.stamp = this->get_clock()->now();
-                vel_msg.twist.linear.x = 0;
-                vel_msg.twist.linear.y = 0;
-                vel_msg.twist.angular.z = 0;
+                geometry_msgs::msg::Twist vel_msg;
+                vel_msg.linear.x = 0;
+                vel_msg.linear.y = 0;
+                vel_msg.angular.z = 0;
                 velocity_pub->publish(vel_msg);
                 return;
             }
@@ -263,10 +259,8 @@ public:
                 target_vel.x() = std::clamp(target_vel.x(), -max_vel_, max_vel_);
                 target_vel.y() = std::clamp(target_vel.y(), -max_vel_, max_vel_);
                 target_vel.z() = std::clamp(target_vel.z(), -max_angle_vel_, max_angle_vel_);
-                geometry_msgs::msg::TwistStamped vel_msg;
-                vel_msg.header.frame_id = "map";
-                vel_msg.header.stamp = this->get_clock()->now();
-                vel_msg.twist = make_twist(target_vel);
+                geometry_msgs::msg::Twist vel_msg;
+                vel_msg = make_twist(target_vel);
                 velocity_pub->publish(vel_msg);
                 return;
             }
@@ -285,10 +279,8 @@ public:
             auto itr = std::max_element(score.data(), score.data() + score.size());
             auto index = std::distance(score.data(), itr);
             auto target_vel = choices_path[index].vel;
-            geometry_msgs::msg::TwistStamped vel_msg;
-            vel_msg.header.frame_id = "map";
-            vel_msg.header.stamp = this->get_clock()->now();
-            vel_msg.twist = make_twist(target_vel);
+            geometry_msgs::msg::Twist vel_msg;
+            vel_msg = make_twist(target_vel);
             velocity_pub->publish(vel_msg);
             path_publish(choices_path[index].path, local_path_pub);
             RCLCPP_INFO(this->get_logger(), "calc time: %f", (this->get_clock()->now() - start_time).seconds());

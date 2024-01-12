@@ -119,10 +119,10 @@ public:
             truth_pos_ = initial_pos_;
         });
 
-        static auto target_vel_sub = create_subscription<geometry_msgs::msg::TwistStamped>("target_vel", rclcpp::QoS(10).reliable(), [&](const geometry_msgs::msg::TwistStamped::SharedPtr msg) {
-            vx_filter.set_input(msg->twist.linear.x);
-            vy_filter.set_input(msg->twist.linear.y);
-            vth_filter.set_input(msg->twist.angular.z);
+        static auto target_vel_sub = create_subscription<geometry_msgs::msg::Twist>("/cmd_vel", 5, [&](const geometry_msgs::msg::Twist::SharedPtr msg) {
+            vx_filter.set_input(msg->linear.x);
+            vy_filter.set_input(msg->linear.y);
+            vth_filter.set_input(msg->angular.z);
         });
 
         static auto localization_sub = create_subscription<nav_msgs::msg::Odometry>("localization", rclcpp::QoS(10).reliable(), [&](const nav_msgs::msg::Odometry::SharedPtr msg) {
