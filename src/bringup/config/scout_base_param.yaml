@@ -2,7 +2,7 @@ scout_base_node:
   ros__parameters:
     use_sim_time: false
     port_name: can0
-    odom_frame: map
+    odom_frame: initial_pos
     base_frame: odom
     odom_topic_name: odom
     is_scout_mini: true

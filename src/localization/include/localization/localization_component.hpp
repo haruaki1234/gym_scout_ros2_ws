@@ -61,11 +61,8 @@ public:
             position_reset_time_ = this->get_clock()->now();
             initial_pos_.head<2>() = init_pos.head<2>();
             initial_pos_.z() = 0;
-            odometer_pos_ = init_pos;
             Eigen::Matrix<double, 3, 3> p0 = Eigen::Matrix<double, 3, 3>::Zero();
             klf_.reset(init_pos, p0);
-            reference_grid_point_.x() = std::floor(init_pos.x() / GRID_WIDTH + 0.5) * GRID_WIDTH;
-            reference_grid_point_.y() = std::floor(init_pos.y() / GRID_WIDTH + 0.5) * GRID_WIDTH;
         };
 
         static auto localization_pub = this->create_publisher<nav_msgs::msg::Odometry>("localization", rclcpp::QoS(10).reliable());
@@ -122,8 +119,7 @@ public:
             auto old_grid_point = reference_grid_point_;
             reference_grid_point_.x() = std::floor(odometer_pos_.x() / GRID_WIDTH + 0.5) * GRID_WIDTH;
             reference_grid_point_.y() = std::floor(odometer_pos_.y() / GRID_WIDTH + 0.5) * GRID_WIDTH;
-            auto initial_pos_xy = initial_pos_.head<2>() - rotate_2d(old_grid_point, initial_pos_.z()) + rotate_2d(reference_grid_point_, initial_pos_.z());
-            initial_pos_.head<2>() = initial_pos_xy;
+            initial_pos_.head<2>() = initial_pos_.head<2>() - rotate_2d(old_grid_point, initial_pos_.z()) + rotate_2d(reference_grid_point_, initial_pos_.z());
             Eigen::Vector2d q = odometer_pos_.head<2>() - reference_grid_point_;
             q = rotate_2d(q, initial_pos_.z());
             for (int i = 0; i < 2; i++) {
@@ -135,20 +131,32 @@ public:
 
             estimate_pos_ = klf_.filtering(estimate_vel_, estimate_pos_);
 
-            nav_msgs::msg::Odometry localization_msg;
-            localization_msg.header.frame_id = "map";
-            localization_msg.header.stamp = this->get_clock()->now();
-            localization_msg.pose.pose = make_pose(estimate_pos_);
-            localization_msg.twist.twist = make_twist(estimate_vel_);
-            localization_pub->publish(localization_msg);
+            {
+                nav_msgs::msg::Odometry localization_msg;
+                localization_msg.header.frame_id = "map";
+                localization_msg.header.stamp = this->get_clock()->now();
+                localization_msg.pose.pose = make_pose(estimate_pos_);
+                localization_msg.twist.twist = make_twist(estimate_vel_);
+                localization_pub->publish(localization_msg);
+            }
 
-            geometry_msgs::msg::TransformStamped transform_stamped;
-            transform_stamped.header.stamp = this->get_clock()->now();
-            transform_stamped.header.frame_id = "map";
-            transform_stamped.child_frame_id = "base_link";
-            transform_stamped.transform = make_geometry_transform(estimate_pos_);
+            {
+                geometry_msgs::msg::TransformStamped transform_stamped;
+                transform_stamped.header.stamp = this->get_clock()->now();
+                transform_stamped.header.frame_id = "map";
+                transform_stamped.child_frame_id = "initial_pos";
+                transform_stamped.transform = make_geometry_transform(initial_pos_ - Eigen::Vector3d(reference_grid_point_.x(), reference_grid_point_.y(), 0));
+                broadcaster_.sendTransform(transform_stamped);
+            }
 
-            broadcaster_.sendTransform(transform_stamped);
+            {
+                geometry_msgs::msg::TransformStamped transform_stamped;
+                transform_stamped.header.stamp = this->get_clock()->now();
+                transform_stamped.header.frame_id = "map";
+                transform_stamped.child_frame_id = "base_link";
+                transform_stamped.transform = make_geometry_transform(estimate_pos_);
+                broadcaster_.sendTransform(transform_stamped);
+            }
         });
     }
 };
