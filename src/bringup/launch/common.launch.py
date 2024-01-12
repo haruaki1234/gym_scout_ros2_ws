@@ -1,6 +1,8 @@
 from ast import arguments
 from http.server import executable
 import os
+import shutil
+import time
 from matplotlib import container
 import yaml
 import launch
@@ -16,6 +18,10 @@ from launch_ros.actions import Node
 from launch_ros.descriptions import ComposableNode
 
 def generate_launch_description():
+    if os.path.isdir("rosbag/log") == True:
+        shutil.rmtree("rosbag/log")
+    
+
     pkg_dir = get_package_share_directory("bringup")
 
     list = [
@@ -57,6 +63,11 @@ def generate_launch_description():
             package='rviz2',
             executable='rviz2',
             arguments=['-d', os.path.join(pkg_dir, "config", "rviz_config.rviz")]
+        ),
+
+        launch.actions.ExecuteProcess(
+            cmd=['ros2', 'bag', 'record', '-a', '-s', 'mcap', '-o', 'rosbag/log'],
+            output='screen'
         ),
 
         # IncludeLaunchDescription(

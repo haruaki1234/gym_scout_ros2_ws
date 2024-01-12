@@ -34,6 +34,13 @@ def generate_launch_description():
                 os.path.join(pkg_dir, "config", "scout_base_param.yaml")
             ]
         ),
+        Node(
+            package='image_tools',
+            executable='cam2image',
+            output='screen',
+            arguments=['--ros-args', '--log-level', "WARN"],
+            parameters=[{"device_id": 0}]
+        ),    
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 [os.path.join(pkg_dir, 'launch', 'common.launch.py')]
