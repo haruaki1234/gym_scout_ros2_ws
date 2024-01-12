@@ -59,8 +59,8 @@ public:
 
         static auto set_position = [&](const Eigen::Vector3d& init_pos) {
             position_reset_time_ = this->get_clock()->now();
-            initial_pos_.head<2>() = init_pos.head<2>();
-            initial_pos_.z() = 0;
+            initial_pos_ = init_pos;
+            initial_pos_[2] -= odometer_pos_[2];
             Eigen::Matrix<double, 3, 3> p0 = Eigen::Matrix<double, 3, 3>::Zero();
             klf_.reset(init_pos, p0);
         };

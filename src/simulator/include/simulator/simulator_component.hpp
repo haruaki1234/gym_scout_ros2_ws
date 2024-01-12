@@ -66,11 +66,11 @@ public:
         initial_pos_.y() = get_parameter("init_y").as_double();
         initial_pos_.z() = get_parameter("init_yaw").as_double();
 
-        truth_pos_ = Eigen::Vector3d::Zero();
+        truth_pos_ = initial_pos_;
         truth_vel_ = Eigen::Vector3d::Zero();
 
-        current_pos_ = truth_pos_;
-        current_vel_ = truth_vel_;
+        current_pos_ = Eigen::Vector3d::Zero();
+        current_vel_ = Eigen::Vector3d::Zero();
 
         target_vel_ = Eigen::Vector3d::Zero();
 
@@ -114,7 +114,10 @@ public:
 
         static auto umap_pos_pub = create_publisher<geometry_msgs::msg::PoseStamped>("umap_pos", rclcpp::QoS(10).reliable());
 
-        static auto set_pose = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>("/initialpose", rclcpp::QoS(10).reliable(), [&](geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg) { initial_pos_ = make_eigen_vector3d(msg->pose.pose); });
+        static auto set_pose = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>("/initialpose", rclcpp::QoS(10).reliable(), [&](geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg) {
+            initial_pos_ = make_eigen_vector3d(msg->pose.pose);
+            truth_pos_ = initial_pos_;
+        });
 
         static auto target_vel_sub = create_subscription<geometry_msgs::msg::TwistStamped>("target_vel", rclcpp::QoS(10).reliable(), [&](const geometry_msgs::msg::TwistStamped::SharedPtr msg) {
             vx_filter.set_input(msg->twist.linear.x);
@@ -129,7 +132,7 @@ public:
 
         static auto umap_sim_timer = create_wall_timer(1s * umap_request_period_, [&]() {
             umap_localization_pos_ = localization_pos_;
-            umap_pos_ = truth_pos_ + initial_pos_;
+            umap_pos_ = truth_pos_;
             umap_pos_.x() += umap_pos_x_dist(engine);
             umap_pos_.y() += umap_pos_y_dist(engine);
             umap_pos_.z() += umap_pos_th_dist(engine);
@@ -162,7 +165,7 @@ public:
             }
             {
                 nav_msgs::msg::Odometry truth_odom_msg;
-                truth_odom_msg.header.frame_id = "initial_pos";
+                truth_odom_msg.header.frame_id = "map";
                 truth_odom_msg.header.stamp = this->get_clock()->now();
                 truth_odom_msg.pose.pose = make_pose(truth_pos_);
                 truth_odom_msg.twist.twist = make_twist(truth_vel_);

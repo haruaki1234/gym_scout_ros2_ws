@@ -17,3 +17,4 @@ route_following_node:
     near_goal_control_distance: 0.5
     near_goal_control_pos_kp: 1.0
     near_goal_control_angle_kp: 1.0
+    goal_distance: 0.1

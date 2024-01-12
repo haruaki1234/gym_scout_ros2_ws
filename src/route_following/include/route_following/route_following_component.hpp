@@ -108,6 +108,8 @@ private:
     double near_goal_control_pos_kp_;
     double near_goal_control_angle_kp_;
 
+    double goal_distance_;
+
     std::vector<Score> scores_;
 
 public:
@@ -152,6 +154,9 @@ public:
         near_goal_control_pos_kp_ = get_parameter("near_goal_control_pos_kp").as_double();
         declare_parameter<double>("near_goal_control_angle_kp", 1.0);
         near_goal_control_angle_kp_ = get_parameter("near_goal_control_angle_kp").as_double();
+
+        declare_parameter<double>("goal_distance", 1.0);
+        goal_distance_ = get_parameter("goal_distance").as_double();
 
         scores_.push_back(Score(score_local_target_distance_waight_, [&](const local_path_data_t& path) { return calc_score_local_target_distance(path); }));
         scores_.push_back(Score(score_local_target_angle_waight_, [&](const local_path_data_t& path) { return calc_score_local_target_angle(path); }));
@@ -240,7 +245,18 @@ public:
                 local_target_pos_pub->publish(local_target_pos_msg);
             }
 
-            if (auto goal_pos = make_eigen_vector3d(global_path_.back().pose); (goal_pos - current_pos_).head<2>().norm() < near_goal_control_distance_) {
+            if (auto goal_pos = make_eigen_vector3d(global_path_.back().pose); (goal_pos - current_pos_).head<2>().norm() < goal_distance_) {
+                global_path_.clear();
+                geometry_msgs::msg::TwistStamped vel_msg;
+                vel_msg.header.frame_id = "map";
+                vel_msg.header.stamp = this->get_clock()->now();
+                vel_msg.twist.linear.x = 0;
+                vel_msg.twist.linear.y = 0;
+                vel_msg.twist.angular.z = 0;
+                velocity_pub->publish(vel_msg);
+                return;
+            }
+            else if ((goal_pos - current_pos_).head<2>().norm() < near_goal_control_distance_) {
                 auto e = goal_pos - current_pos_;
                 auto target_vel = Eigen::Vector3d(e.x() * near_goal_control_pos_kp_, e.y() * near_goal_control_pos_kp_, e.z() * near_goal_control_angle_kp_);
                 target_vel.head<2>() = rotate_2d(target_vel.head<2>(), -current_pos_.z());
