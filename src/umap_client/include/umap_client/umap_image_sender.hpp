@@ -22,6 +22,7 @@ public:
         float roll = 0;
         float pitch = 0;
         float yaw = 0;
+        pose_t(float _x = 0, float _y = 0, float _z = 0, float _roll = 0, float _pitch = 0, float _yaw = 0) : x(_x), y(_y), z(_z), roll(_roll), pitch(_pitch), yaw(_yaw) {}
     };
     struct result_t {
         pose_t pose;
