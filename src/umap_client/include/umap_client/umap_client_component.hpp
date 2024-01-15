@@ -49,7 +49,6 @@ public:
         static double umap_matching_distance = get_parameter("umap_matching_distance").as_double();
 
         static umap::UmapImageSender umap_image_sender(get_parameter("server_ip").as_string(), get_parameter("server_port").as_int(), get_parameter("device_id").as_string(), get_parameter("camera_number").as_int());
-        umap_image_sender.is_return = false;
 
         static auto umap_pos_pub = create_publisher<geometry_msgs::msg::PoseStamped>("umap_pos", rclcpp::QoS(10).reliable());
 
@@ -63,22 +62,21 @@ public:
         });
 
         static auto umap_shot_timer = create_wall_timer(1s * period, [&]() {
-            // if (!image_msg_) {
-            //     return;
-            // }
-            // cv_bridge::CvImagePtr cv_ptr;
-            // try {
-            //     cv_ptr = cv_bridge::toCvCopy(image_msg_, image_msg_->encoding);
-            // }
-            // catch (cv_bridge::Exception& e) {
-            //     RCLCPP_ERROR(get_logger(), "cv_bridge exception: %s", e.what());
-            // }
+            if (!image_msg_) {
+                return;
+            }
+            cv_bridge::CvImagePtr cv_ptr;
+            try {
+                cv_ptr = cv_bridge::toCvCopy(image_msg_, image_msg_->encoding);
+            }
+            catch (cv_bridge::Exception& e) {
+                RCLCPP_ERROR(get_logger(), "cv_bridge exception: %s", e.what());
+                return;
+            }
             auto take_picture_pos = take_picture_pos_;
-            cv::Mat read_img = cv::imread("src/bringup/config/IMG_1582.JPG");
 
             cv::Mat resize_img;
-            // cv::resize(cv_ptr->image, resize_img, resize_size, 0, 0, cv::INTER_AREA);
-            cv::resize(read_img, resize_img, resize_size, 0, 0, cv::INTER_AREA);
+            cv::resize(cv_ptr->image, resize_img, resize_size, 0, 0, cv::INTER_AREA);
             cv::Mat canny_img;
             cv::Canny(resize_img, canny_img, canny_threshould1, canny_threshould2);
             auto umap_result = umap_image_sender.send_from_mat(canny_img, umap::UmapImageSender::pose_t(take_picture_pos.x(), take_picture_pos.y(), 0, 0, take_picture_pos.z()), umap_matching_distance);

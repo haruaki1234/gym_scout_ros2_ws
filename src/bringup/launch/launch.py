@@ -39,7 +39,7 @@ def generate_launch_description():
             executable='cam2image',
             output='screen',
             arguments=['--ros-args', '--log-level', "WARN"],
-            parameters=[{"device_id": 0}]
+            parameters=[{"device_id": 2}]
         ),    
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(

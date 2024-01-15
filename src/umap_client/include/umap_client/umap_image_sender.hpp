@@ -140,7 +140,7 @@ private:
         }
         else {
             std::array<float, 9> float_array;
-            std::memcpy(float_array.data(), asio::buffer_cast<const uint8_t*>(receive_buffer.data()), 9);
+            std::memcpy(float_array.data(), asio::buffer_cast<const uint8_t*>(receive_buffer.data()), sizeof(float) * 9);
             result.pose.x = float_array[0];
             result.pose.y = float_array[1];
             result.pose.z = float_array[2];

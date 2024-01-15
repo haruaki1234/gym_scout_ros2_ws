@@ -21,7 +21,7 @@ def generate_launch_description():
         Node(
             package='rviz2',
             executable='rviz2',
-            arguments=['-d', os.path.join(get_package_share_directory("bringup"), "config", "rosbag_play.rviz")]
+            arguments=['-d', os.path.join(get_package_share_directory("bringup"), "config", "rviz_config.rviz")]
         ),
 
         launch.actions.ExecuteProcess(
