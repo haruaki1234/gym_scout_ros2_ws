@@ -81,7 +81,7 @@ public:
             cv::resize(read_img, resize_img, resize_size, 0, 0, cv::INTER_AREA);
             cv::Mat canny_img;
             cv::Canny(resize_img, canny_img, canny_threshould1, canny_threshould2);
-            auto umap_result = umap_image_sender.send_from_mat(canny_img, umap::UmapImageSender::pose_t(current_pos_.x(), current_pos_.y(), 0, 0, current_pos_.z()), umap_matching_distance);
+            auto umap_result = umap_image_sender.send_from_mat(canny_img, umap::UmapImageSender::pose_t(take_picture_pos.x(), take_picture_pos.y(), 0, 0, take_picture_pos.z()), umap_matching_distance);
             if (umap_result) {
                 auto umap_pos = Eigen::Vector3d(umap_result->pose.x, umap_result->pose.y, umap_result->pose.yaw);
                 auto localization_diff = current_pos_ - take_picture_pos;
