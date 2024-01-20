@@ -109,10 +109,9 @@ private:
         file_name << ".png";
         return file_name.str();
     }
-    void send_binary(const std::vector<uint8_t>& binary)
+    void send_binary(asio::ip::tcp::socket& socket, const std::vector<uint8_t>& binary)
     {
         using asio::ip::tcp;
-        tcp::socket socket(io_context_);
         try {
             socket.connect(tcp::endpoint(asio::ip::address_v4::from_string(address_), port_));
             io_context_.run();
@@ -121,18 +120,17 @@ private:
         catch (const std::exception& e) {
             std::cout << e.what() << std::endl;
         }
-        socket.close();
     }
-    result_t receive()
+    result_t receive(asio::ip::tcp::socket& socket)
     {
         using asio::ip::tcp;
-        tcp::acceptor acceptor(io_context_, tcp::endpoint(tcp::v4(), port_));
-        tcp::socket socket(io_context_);
+        // tcp::acceptor acceptor(io_context_, tcp::endpoint(tcp::v4(), port_));
+        // tcp::socket socket(io_context_);
         asio::streambuf receive_buffer;
         std::error_code error;
-        acceptor.accept(socket);
-        asio::socket_base::keep_alive option(true);
-        socket.set_option(option);
+        // acceptor.accept(socket);
+        // asio::socket_base::keep_alive option(true);
+        // socket.set_option(option);
 
         result_t result;
         asio::read(socket, receive_buffer, asio::transfer_all(), error);
@@ -159,24 +157,30 @@ private:
 
 public:
     UmapImageSender(const std::string& address, int port, const std::string& device_id, int camera_number) : address_(address), port_(port), device_id_(device_id), camera_number_(camera_number) {}
-    std::optional<result_t> send_from_mat(const cv::Mat& img, const pose_t& pose, float matching_distance)
+    std::optional<result_t> send_from_mat(const cv::Mat& img, const pose_t& pose, float matching_distance, float matching_angle_distance)
     {
         auto file_name = make_file_name();
         std::vector<uint8_t> file_name_binary(file_name.begin(), file_name.end());
         std::vector<uint8_t> img_binary;
         cv::imencode(".png", img, img_binary);
-        std::array<float, 7> float_array = {pose.x, pose.y, pose.z, pose.roll, pose.pitch, pose.yaw, matching_distance};
-        std::vector<uint8_t> float_binary(sizeof(float) * 7);
-        std::memcpy(float_binary.data(), float_array.data(), sizeof(float) * 7);
+        std::array<float, 8> float_array = {pose.x, pose.y, pose.z, pose.roll, pose.pitch, pose.yaw, matching_distance, matching_angle_distance};
+        std::vector<uint8_t> float_binary(sizeof(float) * 8);
+        std::memcpy(float_binary.data(), float_array.data(), sizeof(float) * 8);
         std::vector<uint8_t> binary;
         binary.insert(binary.end(), file_name_binary.begin(), file_name_binary.end());
         binary.insert(binary.end(), img_binary.begin(), img_binary.end());
         binary.insert(binary.end(), float_binary.begin(), float_binary.end());
-        send_binary(binary);
+        uint32_t data_size = binary.size();
+        std::vector<uint8_t> data_size_binary(sizeof(uint32_t));
+        std::memcpy(data_size_binary.data(), &data_size, sizeof(uint32_t));
+        binary.insert(binary.begin(), data_size_binary.begin(), data_size_binary.end());
+        asio::ip::tcp::socket socket(io_context_);
+        send_binary(socket, binary);
         if (is_return) {
-            return receive();
+            return receive(socket);
         }
         else {
+            socket.close();
             return std::nullopt;
         }
     }

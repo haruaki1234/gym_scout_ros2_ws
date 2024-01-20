@@ -1,10 +1,10 @@
 global_path_planner_node:
   ros__parameters:
-    map_path: src/bringup/config/resize_IMG_4558v2((-2.234057,-1.314902),(42.470786,62.515291)).png
-    min_x: -2.234057
-    max_x: 42.470786
-    min_y: -1.314902
-    max_y: 62.515291
+    map_path: src/bringup/config/resize_IMG_4558v2((-2.29928,-1.46917),(44.26186,65.41468)).png
+    min_x: -2.29928
+    max_x: 44.26186
+    min_y: -1.46917
+    max_y: 65.41468
     diagonal_movement: true
     wall_search_range: 1
     wall_cost_waight: 1.0

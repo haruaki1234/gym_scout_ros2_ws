@@ -31,6 +31,14 @@ public:
         declare_parameter("period", 0.01);
         static double period = get_parameter("period").as_double();
 
+        static Eigen::Vector3d offset_pos;
+        declare_parameter("offset_pos_x", 0.0);
+        offset_pos.x() = get_parameter("offset_pos_x").as_double();
+        declare_parameter("offset_pos_y", 0.0);
+        offset_pos.y() = get_parameter("offset_pos_y").as_double();
+        declare_parameter("offset_pos_yaw", 0.0);
+        offset_pos.z() = get_parameter("offset_pos_yaw").as_double();
+
         declare_parameter("server_ip", "192.168.11.8");
         declare_parameter("server_port", 50000);
         declare_parameter("device_id", "TB01");
@@ -45,8 +53,13 @@ public:
         declare_parameter("canny_threshould2", 110.0);
         static double canny_threshould2 = get_parameter("canny_threshould2").as_double();
 
+        declare_parameter("umap_request_minimum_pixel_rate", 0.0);
+        static double umap_request_minimum_pixel_rate = get_parameter("umap_request_minimum_pixel_rate").as_double();
+
         declare_parameter("umap_matching_distance", -1.0);
         static double umap_matching_distance = get_parameter("umap_matching_distance").as_double();
+        declare_parameter("umap_matching_angle_distance", -1.0);
+        static double umap_matching_angle_distance = get_parameter("umap_matching_angle_distance").as_double();
 
         static umap::UmapImageSender umap_image_sender(get_parameter("server_ip").as_string(), get_parameter("server_port").as_int(), get_parameter("device_id").as_string(), get_parameter("camera_number").as_int());
 
@@ -74,17 +87,23 @@ public:
                 return;
             }
             auto take_picture_pos = take_picture_pos_;
-
             cv::Mat resize_img;
             cv::resize(cv_ptr->image, resize_img, resize_size, 0, 0, cv::INTER_AREA);
             cv::Mat canny_img;
             cv::Canny(resize_img, canny_img, canny_threshould1, canny_threshould2);
-            auto umap_result = umap_image_sender.send_from_mat(canny_img, umap::UmapImageSender::pose_t(take_picture_pos.x(), take_picture_pos.y(), 0, 0, 0, take_picture_pos.z()), umap_matching_distance);
+
+            if (umap_request_minimum_pixel_rate * resize_size.area() > cv::countNonZero(canny_img)) {
+                return;
+            }
+
+            auto umap_result = umap_image_sender.send_from_mat(canny_img, umap::UmapImageSender::pose_t(take_picture_pos.x(), take_picture_pos.y(), 0, 0, 0, take_picture_pos.z()), umap_matching_distance, umap_matching_angle_distance);
             if (umap_result) {
                 auto umap_pos = Eigen::Vector3d(umap_result->pose.x, umap_result->pose.y, umap_result->pose.yaw);
                 auto localization_diff = current_pos_ - take_picture_pos;
                 umap_pos.head<2>() += rotate_2d(localization_diff.head<2>(), umap_pos.z() - take_picture_pos.z());
                 umap_pos.z() += localization_diff.z();
+                umap_pos.z() -= offset_pos.z();
+                umap_pos.head<2>() -= rotate_2d(offset_pos.head<2>(), umap_pos.z());
 
                 geometry_msgs::msg::PoseStamped umap_pos_msg;
                 umap_pos_msg.header.frame_id = "map";

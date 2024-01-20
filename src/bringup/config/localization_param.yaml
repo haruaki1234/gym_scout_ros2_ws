@@ -1,8 +1,8 @@
 localization_node:
   ros__parameters:
     period: 0.01
-    start_pos: [1.0 , 1.0 , 0.0]
+    start_pos: [5.2 , 61.0 , 3.14]
     grid_point_observer:
       grid_width: 0.01
-      gain_xy: 0.1
-      gain_theta: 0.1
+      gain_xy: 0.2
+      gain_theta: 0.2
