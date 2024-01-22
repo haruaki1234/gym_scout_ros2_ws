@@ -283,7 +283,9 @@ public:
             vel_msg = make_twist(target_vel);
             velocity_pub->publish(vel_msg);
             path_publish(choices_path[index].path, local_path_pub);
-            RCLCPP_INFO(this->get_logger(), "calc time: %f", (this->get_clock()->now() - start_time).seconds());
+            if ((this->get_clock()->now() - start_time).seconds() > control_period_) {
+                RCLCPP_WARN(this->get_logger(), "calc time: %f", (this->get_clock()->now() - start_time).seconds());
+            }
         });
     }
 

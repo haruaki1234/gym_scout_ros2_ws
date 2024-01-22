@@ -83,7 +83,7 @@ public:
                 cv_ptr = cv_bridge::toCvCopy(image_msg_, image_msg_->encoding);
             }
             catch (cv_bridge::Exception& e) {
-                RCLCPP_ERROR(get_logger(), "cv_bridge exception: %s", e.what());
+                RCLCPP_ERROR(this->get_logger(), "cv_bridge exception: %s", e.what());
                 return;
             }
             auto take_picture_pos = take_picture_pos_;
@@ -93,6 +93,7 @@ public:
             cv::Canny(resize_img, canny_img, canny_threshould1, canny_threshould2);
 
             if (umap_request_minimum_pixel_rate * resize_size.area() > cv::countNonZero(canny_img)) {
+                RCLCPP_WARN(this->get_logger(), "umap request minimum pixel rate is not satisfied");
                 return;
             }
 

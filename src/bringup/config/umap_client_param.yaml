@@ -12,6 +12,6 @@ umap_client_node:
     resize_height: 240
     canny_threshould1: 50.0
     canny_threshould2: 110.0
-    umap_request_minimum_pixel_rate: 0.0
-    umap_matching_distance: 1.0
-    umap_matching_angle_distance: 0.5
+    umap_request_minimum_pixel_rate: 0.01
+    umap_matching_distance: 3.0
+    umap_matching_angle_distance: 1.0

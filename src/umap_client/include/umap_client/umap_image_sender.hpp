@@ -109,33 +109,33 @@ private:
         file_name << ".png";
         return file_name.str();
     }
-    void send_binary(asio::ip::tcp::socket& socket, const std::vector<uint8_t>& binary)
+    bool send_binary(asio::ip::tcp::socket& socket, const std::vector<uint8_t>& binary)
     {
         using asio::ip::tcp;
         try {
             socket.connect(tcp::endpoint(asio::ip::address_v4::from_string(address_), port_));
             io_context_.run();
             asio::write(socket, asio::buffer(binary, binary.size()));
+            return true;
         }
         catch (const std::exception& e) {
             std::cout << e.what() << std::endl;
+            socket.close();
+            return false;
         }
     }
-    result_t receive(asio::ip::tcp::socket& socket)
+    std::optional<result_t> receive(asio::ip::tcp::socket& socket)
     {
         using asio::ip::tcp;
-        // tcp::acceptor acceptor(io_context_, tcp::endpoint(tcp::v4(), port_));
-        // tcp::socket socket(io_context_);
         asio::streambuf receive_buffer;
         std::error_code error;
-        // acceptor.accept(socket);
-        // asio::socket_base::keep_alive option(true);
-        // socket.set_option(option);
 
         result_t result;
         asio::read(socket, receive_buffer, asio::transfer_all(), error);
         if (error && error != asio::error::eof) {
             std::cout << "receive failed : " << error.message() << std::endl;
+            socket.close();
+            return std::nullopt;
         }
         else {
             std::array<float, 9> float_array;
@@ -150,9 +150,10 @@ private:
             result.similar_average = float_array[7];
             result.similar_variance = float_array[8];
             receive_buffer.consume(receive_buffer.size());
+
+            socket.close();
+            return result;
         }
-        socket.close();
-        return result;
     }
 
 public:
@@ -175,7 +176,9 @@ public:
         std::memcpy(data_size_binary.data(), &data_size, sizeof(uint32_t));
         binary.insert(binary.begin(), data_size_binary.begin(), data_size_binary.end());
         asio::ip::tcp::socket socket(io_context_);
-        send_binary(socket, binary);
+        if (!send_binary(socket, binary)) {
+            return std::nullopt;
+        }
         if (is_return) {
             return receive(socket);
         }
