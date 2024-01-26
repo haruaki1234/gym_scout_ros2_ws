@@ -20,6 +20,7 @@ private:
     Eigen::Vector3d current_pos_;
 
     Eigen::Vector3d take_picture_pos_;
+    rclcpp::Time take_picture_time_;
 
 public:
     UmapClient(const rclcpp::NodeOptions& options) : UmapClient("", options) {}
@@ -67,6 +68,7 @@ public:
         static auto image_sub = this->create_subscription<sensor_msgs::msg::Image>("/image", rclcpp::QoS(rclcpp::KeepLast(3)), [&](sensor_msgs::msg::Image::SharedPtr msg) {
             image_msg_ = msg;
             take_picture_pos_ = current_pos_;
+            take_picture_time_ = this->get_clock()->now();
         });
         static auto localization_sub = create_subscription<nav_msgs::msg::Odometry>("ekf_odom", rclcpp::QoS(10).reliable(), [&](const nav_msgs::msg::Odometry::SharedPtr msg) { current_pos_ = make_eigen_vector3d(msg->pose.pose); });
 
@@ -83,6 +85,7 @@ public:
                 return;
             }
             auto take_picture_pos = take_picture_pos_;
+            auto take_picture_time = take_picture_time_;
             cv::Mat resize_img;
             cv::resize(cv_ptr->image, resize_img, resize_size, 0, 0, cv::INTER_AREA);
             cv::Mat canny_img;
@@ -96,15 +99,15 @@ public:
             auto umap_result = umap_image_sender.send_from_mat(canny_img, umap::UmapImageSender::pose_t(take_picture_pos.x(), take_picture_pos.y(), 0, 0, 0, take_picture_pos.z()), umap_matching_distance, umap_matching_angle_distance);
             if (umap_result) {
                 auto umap_pos = Eigen::Vector3d(umap_result->pose.x, umap_result->pose.y, umap_result->pose.yaw);
-                auto localization_diff = current_pos_ - take_picture_pos;
-                umap_pos.head<2>() += rotate_2d(localization_diff.head<2>(), umap_pos.z() - take_picture_pos.z());
-                umap_pos.z() += localization_diff.z();
+                // auto localization_diff = current_pos_ - take_picture_pos;
+                // umap_pos.head<2>() += rotate_2d(localization_diff.head<2>(), umap_pos.z() - take_picture_pos.z());
+                // umap_pos.z() += localization_diff.z();
                 umap_pos.z() -= offset_pos.z();
                 umap_pos.head<2>() -= rotate_2d(offset_pos.head<2>(), umap_pos.z());
 
                 geometry_msgs::msg::PoseStamped umap_pos_msg;
                 umap_pos_msg.header.frame_id = "map";
-                umap_pos_msg.header.stamp = this->get_clock()->now();
+                umap_pos_msg.header.stamp = take_picture_time;
                 umap_pos_msg.pose = make_pose(umap_pos);
                 umap_pos_pub->publish(umap_pos_msg);
             }

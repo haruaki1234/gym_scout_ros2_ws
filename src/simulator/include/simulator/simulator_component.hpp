@@ -102,6 +102,8 @@ public:
         static std::normal_distribution<> umap_pos_y_dist(get_parameter("umap_pos_y_mean").as_double(), get_parameter("umap_pos_y_stddev").as_double());
         static std::normal_distribution<> umap_pos_th_dist(get_parameter("umap_pos_yaw_mean").as_double(), get_parameter("umap_pos_yaw_stddev").as_double());
 
+        static std::uniform_real_distribution<> rand_01(0.0, 1.0);
+
         static ClampVelLimitFilter vx_filter(-max_vel_, max_vel_, max_acc_, dt_);
         static ClampVelLimitFilter vy_filter(-max_vel_, max_vel_, max_acc_, dt_);
         static ClampVelLimitFilter vth_filter(-max_ang_vel_, max_ang_vel_, max_ang_acc_, dt_);
@@ -130,6 +132,10 @@ public:
         static auto umap_sim_timer = create_wall_timer(1s * umap_request_period_, [&]() {
             umap_localization_pos_ = localization_pos_;
             umap_pos_ = truth_pos_;
+            // double outlier_gain = 1.0;
+            // if (rand_01(engine) < 0.1) {
+            //     outlier_gain = 20.0;
+            // }
             umap_pos_.x() += umap_pos_x_dist(engine);
             umap_pos_.y() += umap_pos_y_dist(engine);
             umap_pos_.z() += umap_pos_th_dist(engine);
