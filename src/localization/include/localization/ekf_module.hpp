@@ -45,7 +45,7 @@ private:
 public:
     EKFModule(rclcpp::Node* node, const HyperParameters params) :
         node_(node), params_(params), //
-        dim_x_(6),                    // x, y, yaw, yaw_bias, vx, wz
+        dim_x_(7),                    // x, y, yaw, yaw_bias, vx, vy, wz
         accumulated_delay_times_(params_.extend_state_step, 1.0E15)
     {
         Eigen::MatrixXd X = Eigen::MatrixXd::Zero(dim_x_, 1);
@@ -55,6 +55,7 @@ public:
             P(IDX::YAWB, IDX::YAWB) = 50.0; // for yaw bias
         }
         P(IDX::VX, IDX::VX) = 1000.0; // for vx
+        P(IDX::VY, IDX::VY) = 1000.0; // for vy
         P(IDX::WZ, IDX::WZ) = 50.0;   // for wz
 
         kalman_filter_.init(X, P, params_.extend_state_step);
@@ -70,6 +71,7 @@ public:
         X(IDX::YAW) = tf2::getYaw(initial_pose.pose.pose.orientation);
         X(IDX::YAWB) = 0.0;
         X(IDX::VX) = 0.0;
+        X(IDX::VY) = 0.0;
         X(IDX::WZ) = 0.0;
 
         using COV_IDX = XYZRPY_COV_IDX;
@@ -81,6 +83,7 @@ public:
             P(IDX::YAWB, IDX::YAWB) = 0.0001;
         }
         P(IDX::VX, IDX::VX) = 0.01;
+        P(IDX::VY, IDX::VY) = 0.01;
         P(IDX::WZ, IDX::WZ) = 0.01;
 
         kalman_filter_.init(X, P, params_.extend_state_step);
@@ -113,12 +116,14 @@ public:
     geometry_msgs::msg::TwistStamped getCurrentTwist(const rclcpp::Time& current_time) const
     {
         const double vx = kalman_filter_.getXelement(IDX::VX);
+        const double vy = kalman_filter_.getXelement(IDX::VY);
         const double wz = kalman_filter_.getXelement(IDX::WZ);
 
         Twist current_ekf_twist;
         current_ekf_twist.header.frame_id = "base_link";
         current_ekf_twist.header.stamp = current_time;
         current_ekf_twist.twist.linear.x = vx;
+        current_ekf_twist.twist.linear.y = vy;
         current_ekf_twist.twist.angular.z = wz;
         return current_ekf_twist;
     }
@@ -172,12 +177,13 @@ public:
         const Eigen::MatrixXd P_curr = kalman_filter_.getLatestP();
 
         const double proc_cov_vx_d = std::pow(params_.proc_stddev_vx_c * dt, 2.0);
+        const double proc_cov_vy_d = std::pow(params_.proc_stddev_vy_c * dt, 2.0);
         const double proc_cov_wz_d = std::pow(params_.proc_stddev_wz_c * dt, 2.0);
         const double proc_cov_yaw_d = std::pow(params_.proc_stddev_yaw_c * dt, 2.0);
 
-        const Vector6d X_next = predictNextState(X_curr, dt);
-        const Matrix6d A = createStateTransitionMatrix(X_curr, dt);
-        const Matrix6d Q = processNoiseCovariance(proc_cov_yaw_d, proc_cov_vx_d, proc_cov_wz_d);
+        const Vector7d X_next = predictNextState(X_curr, dt);
+        const Matrix7d A = createStateTransitionMatrix(X_curr, dt);
+        const Matrix7d Q = processNoiseCovariance(proc_cov_yaw_d, proc_cov_vx_d, proc_cov_vy_d, proc_cov_wz_d);
         kalman_filter_.predictWithDelay(X_next, A, Q);
     }
 
@@ -238,7 +244,7 @@ public:
         DEBUG_PRINT_MAT(y_ekf.transpose());
         DEBUG_PRINT_MAT((y - y_ekf).transpose());
 
-        const Eigen::Matrix<double, 3, 6> C = poseMeasurementMatrix();
+        const Eigen::Matrix<double, 3, 7> C = poseMeasurementMatrix();
         const Eigen::Matrix3d R = poseMeasurementCovariance(pose.pose.covariance, params_.pose_smoothing_steps);
 
         kalman_filter_.updateWithDelay(y, C, R, delay_step);
@@ -256,7 +262,7 @@ public:
         const Eigen::MatrixXd X_curr = kalman_filter_.getLatestX();
         DEBUG_PRINT_MAT(X_curr.transpose());
 
-        constexpr int dim_y = 2; // vx, wz
+        constexpr int dim_y = 3; // vx, vy, wz
 
         /* Calculate delay step */
         double delay_time = (t_curr - twist.header.stamp).seconds() + params_.twist_additional_delay;
@@ -274,14 +280,14 @@ public:
 
         /* Set measurement matrix */
         Eigen::MatrixXd y(dim_y, 1);
-        y << twist.twist.twist.linear.x, twist.twist.twist.angular.z;
+        y << twist.twist.twist.linear.x, twist.twist.twist.linear.y, twist.twist.twist.angular.z;
 
         if (hasNan(y) || hasInf(y)) {
             RCLCPP_WARN(node_->get_logger(), "[EKF] twist measurement matrix includes NaN of Inf. ignore update. check twist message.");
             return false;
         }
 
-        const Eigen::Vector2d y_ekf(kalman_filter_.getXelement(delay_step * dim_x_ + IDX::VX), kalman_filter_.getXelement(delay_step * dim_x_ + IDX::WZ));
+        const Eigen::Vector3d y_ekf(kalman_filter_.getXelement(delay_step * dim_x_ + IDX::VX), kalman_filter_.getXelement(delay_step * dim_x_ + IDX::VY), kalman_filter_.getXelement(delay_step * dim_x_ + IDX::WZ));
         const Eigen::MatrixXd P_curr = kalman_filter_.getLatestP();
         const Eigen::MatrixXd P_y = P_curr.block(4, 4, dim_y, dim_y);
 
@@ -295,9 +301,8 @@ public:
         DEBUG_PRINT_MAT(y_ekf.transpose());
         DEBUG_PRINT_MAT((y - y_ekf).transpose());
 
-        const Eigen::Matrix<double, 2, 6> C = twistMeasurementMatrix();
-        const Eigen::Matrix2d R = twistMeasurementCovariance(twist.twist.covariance, params_.twist_smoothing_steps);
-
+        const Eigen::Matrix<double, 3, 7> C = twistMeasurementMatrix();
+        const Eigen::Matrix3d R = twistMeasurementCovariance(twist.twist.covariance, params_.twist_smoothing_steps);
         kalman_filter_.updateWithDelay(y, C, R, delay_step);
 
         // debug

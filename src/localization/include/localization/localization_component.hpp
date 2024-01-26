@@ -46,6 +46,7 @@ private:
     double proc_cov_yaw_d_;      //!< @brief  discrete yaw process noise
     double proc_cov_yaw_bias_d_; //!< @brief  discrete yaw bias process noise
     double proc_cov_vx_d_;       //!< @brief  discrete process noise in d_vx=0
+    double proc_cov_vy_d_;       //!< @brief  discrete process noise in d_vy=0
     double proc_cov_wz_d_;       //!< @brief  discrete process noise in d_wz=0
 
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pub_pose_;
@@ -69,6 +70,7 @@ public:
         using namespace std::chrono_literals;
 
         proc_cov_vx_d_ = std::pow(params_.proc_stddev_vx_c * ekf_dt_, 2.0);
+        proc_cov_vy_d_ = std::pow(params_.proc_stddev_vy_c * ekf_dt_, 2.0);
         proc_cov_wz_d_ = std::pow(params_.proc_stddev_wz_c * ekf_dt_, 2.0);
         proc_cov_yaw_d_ = std::pow(params_.proc_stddev_yaw_c * ekf_dt_, 2.0);
 
@@ -197,6 +199,7 @@ private:
 
                 /* Update discrete proc_cov*/
                 proc_cov_vx_d_ = std::pow(params_.proc_stddev_vx_c * ekf_dt_, 2.0);
+                proc_cov_vy_d_ = std::pow(params_.proc_stddev_vy_c * ekf_dt_, 2.0);
                 proc_cov_wz_d_ = std::pow(params_.proc_stddev_wz_c * ekf_dt_, 2.0);
                 proc_cov_yaw_d_ = std::pow(params_.proc_stddev_yaw_c * ekf_dt_, 2.0);
             }

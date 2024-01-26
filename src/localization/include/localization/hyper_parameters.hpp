@@ -26,9 +26,11 @@ public:
         twist_gate_dist(node->declare_parameter("twist_gate_dist", 10000.0)),                    //
         twist_smoothing_steps(node->declare_parameter("twist_smoothing_steps", 2)),              //
         proc_stddev_vx_c(node->declare_parameter("proc_stddev_vx_c", 5.0)),                      //
+        proc_stddev_vy_c(node->declare_parameter("proc_stddev_vy_c", 5.0)),                      //
         proc_stddev_wz_c(node->declare_parameter("proc_stddev_wz_c", 1.0)),                      //
         proc_stddev_yaw_c(node->declare_parameter("proc_stddev_yaw_c", 0.005)),                  //
         twist_stddev_vx_c(node->declare_parameter("twist_stddev_vx_c", 0.1)),                    //
+        twist_stddev_vy_c(node->declare_parameter("twist_stddev_vy_c", 0.1)),                    //
         twist_stddev_wz_c(node->declare_parameter("twist_stddev_wz_c", 0.1))                     //
     {
     }
@@ -48,9 +50,11 @@ public:
     const double twist_gate_dist;
     const int twist_smoothing_steps;
     const double proc_stddev_vx_c;  //!< @brief  vx process noise
+    const double proc_stddev_vy_c;  //!< @brief  vy process noise
     const double proc_stddev_wz_c;  //!< @brief  wz process noise
     const double proc_stddev_yaw_c; //!< @brief  yaw process noise
     const double twist_stddev_vx_c;
+    const double twist_stddev_vy_c;
     const double twist_stddev_wz_c;
 };
 

@@ -33,7 +33,6 @@ private:
     Eigen::Vector3d current_pos_;
     Eigen::Vector3d current_vel_;
 
-    Eigen::Vector3d localization_vel_;
     Eigen::Vector3d localization_pos_;
 
     std::optional<rclcpp::Time> umap_request_time_ = std::nullopt;
@@ -126,10 +125,7 @@ public:
             vth_filter.set_input(msg->angular.z);
         });
 
-        static auto localization_sub = create_subscription<nav_msgs::msg::Odometry>("ekf_odom", rclcpp::QoS(10).reliable(), [&](const nav_msgs::msg::Odometry::SharedPtr msg) {
-            localization_pos_ = make_eigen_vector3d(msg->pose.pose);
-            localization_vel_ = make_eigen_vector3d(msg->twist.twist);
-        });
+        static auto localization_sub = create_subscription<nav_msgs::msg::Odometry>("ekf_odom", rclcpp::QoS(10).reliable(), [&](const nav_msgs::msg::Odometry::SharedPtr msg) { localization_pos_ = make_eigen_vector3d(msg->pose.pose); });
 
         static auto umap_sim_timer = create_wall_timer(1s * umap_request_period_, [&]() {
             umap_localization_pos_ = localization_pos_;

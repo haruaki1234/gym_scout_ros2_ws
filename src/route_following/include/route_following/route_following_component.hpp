@@ -171,6 +171,7 @@ public:
         static auto localization_sub = create_subscription<nav_msgs::msg::Odometry>("ekf_odom", rclcpp::QoS(10).reliable(), [&](const nav_msgs::msg::Odometry::SharedPtr msg) {
             current_pos_ = make_eigen_vector3d(msg->pose.pose);
             current_vel_ = make_eigen_vector3d(msg->twist.twist);
+            current_vel_.head<2>() = rotate_2d(current_vel_.head<2>(), current_pos_.z());
         });
         static auto global_path_sub = create_subscription<nav_msgs::msg::Path>("global_path", rclcpp::QoS(10).reliable(), [&](const nav_msgs::msg::Path::SharedPtr msg) {
             global_path_ = msg->poses;

@@ -17,7 +17,6 @@ namespace tlab
 class UmapClient : public rclcpp::Node {
 private:
     sensor_msgs::msg::Image::SharedPtr image_msg_;
-    Eigen::Vector3d current_vel_;
     Eigen::Vector3d current_pos_;
 
     Eigen::Vector3d take_picture_pos_;
@@ -69,10 +68,7 @@ public:
             image_msg_ = msg;
             take_picture_pos_ = current_pos_;
         });
-        static auto localization_sub = create_subscription<nav_msgs::msg::Odometry>("ekf_odom", rclcpp::QoS(10).reliable(), [&](const nav_msgs::msg::Odometry::SharedPtr msg) {
-            current_pos_ = make_eigen_vector3d(msg->pose.pose);
-            current_vel_ = make_eigen_vector3d(msg->twist.twist);
-        });
+        static auto localization_sub = create_subscription<nav_msgs::msg::Odometry>("ekf_odom", rclcpp::QoS(10).reliable(), [&](const nav_msgs::msg::Odometry::SharedPtr msg) { current_pos_ = make_eigen_vector3d(msg->pose.pose); });
 
         static auto umap_shot_timer = create_wall_timer(1s * period, [&]() {
             if (!image_msg_) {

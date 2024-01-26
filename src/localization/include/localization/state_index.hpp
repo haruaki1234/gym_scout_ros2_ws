@@ -10,7 +10,8 @@ enum IDX {
     YAW = 2,
     YAWB = 3,
     VX = 4,
-    WZ = 5,
+    VY = 5,
+    WZ = 6,
 };
 // clang-format on
 
