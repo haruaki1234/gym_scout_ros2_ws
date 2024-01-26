@@ -9,18 +9,18 @@
 namespace tlab
 {
 
-static inline Eigen::Matrix<double, 3, 7> poseMeasurementMatrix()
+static inline Eigen::Matrix<double, 3, 6> poseMeasurementMatrix()
 {
-    Eigen::Matrix<double, 3, 7> C = Eigen::Matrix<double, 3, 7>::Zero();
+    Eigen::Matrix<double, 3, 6> C = Eigen::Matrix<double, 3, 6>::Zero();
     C(0, IDX::X) = 1.0;   // for pos x
     C(1, IDX::Y) = 1.0;   // for pos y
     C(2, IDX::YAW) = 1.0; // for yaw
     return C;
 }
 
-static inline Eigen::Matrix<double, 3, 7> twistMeasurementMatrix()
+static inline Eigen::Matrix<double, 3, 6> twistMeasurementMatrix()
 {
-    Eigen::Matrix<double, 3, 7> C = Eigen::Matrix<double, 3, 7>::Zero();
+    Eigen::Matrix<double, 3, 6> C = Eigen::Matrix<double, 3, 6>::Zero();
     C(0, IDX::VX) = 1.0; // for vx
     C(1, IDX::VY) = 1.0; // for vy
     C(2, IDX::WZ) = 1.0; // for wz

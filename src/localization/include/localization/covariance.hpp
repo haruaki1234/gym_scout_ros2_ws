@@ -8,7 +8,7 @@
 namespace tlab
 {
 
-static inline std::array<double, 36> ekfCovarianceToPoseMessageCovariance(const Matrix7d& P)
+static inline std::array<double, 36> ekfCovarianceToPoseMessageCovariance(const Matrix6d& P)
 {
     std::array<double, 36> covariance;
     covariance.fill(0.);
@@ -26,7 +26,7 @@ static inline std::array<double, 36> ekfCovarianceToPoseMessageCovariance(const 
     return covariance;
 }
 
-static inline std::array<double, 36> ekfCovarianceToTwistMessageCovariance(const Matrix7d& P)
+static inline std::array<double, 36> ekfCovarianceToTwistMessageCovariance(const Matrix6d& P)
 {
     std::array<double, 36> covariance;
     covariance.fill(0.);

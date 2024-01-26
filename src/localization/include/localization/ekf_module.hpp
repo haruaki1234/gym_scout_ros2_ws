@@ -45,18 +45,15 @@ private:
 public:
     EKFModule(rclcpp::Node* node, const HyperParameters params) :
         node_(node), params_(params), //
-        dim_x_(7),                    // x, y, yaw, yaw_bias, vx, vy, wz
+        dim_x_(6),                    // x, y, yaw, vx, vy, wz
         accumulated_delay_times_(params_.extend_state_step, 1.0E15)
     {
         Eigen::MatrixXd X = Eigen::MatrixXd::Zero(dim_x_, 1);
         Eigen::MatrixXd P = Eigen::MatrixXd::Identity(dim_x_, dim_x_) * 1.0E15; // for x & y
         P(IDX::YAW, IDX::YAW) = 50.0;                                           // for yaw
-        if (params_.enable_yaw_bias_estimation) {
-            P(IDX::YAWB, IDX::YAWB) = 50.0; // for yaw bias
-        }
-        P(IDX::VX, IDX::VX) = 1000.0; // for vx
-        P(IDX::VY, IDX::VY) = 1000.0; // for vy
-        P(IDX::WZ, IDX::WZ) = 50.0;   // for wz
+        P(IDX::VX, IDX::VX) = 1000.0;                                           // for vx
+        P(IDX::VY, IDX::VY) = 1000.0;                                           // for vy
+        P(IDX::WZ, IDX::WZ) = 50.0;                                             // for wz
 
         kalman_filter_.init(X, P, params_.extend_state_step);
     }
@@ -69,7 +66,6 @@ public:
         X(IDX::X) = initial_pose.pose.pose.position.x;
         X(IDX::Y) = initial_pose.pose.pose.position.y;
         X(IDX::YAW) = tf2::getYaw(initial_pose.pose.pose.orientation);
-        X(IDX::YAWB) = 0.0;
         X(IDX::VX) = 0.0;
         X(IDX::VY) = 0.0;
         X(IDX::WZ) = 0.0;
@@ -78,10 +74,6 @@ public:
         P(IDX::X, IDX::X) = initial_pose.pose.covariance[COV_IDX::X_X];
         P(IDX::Y, IDX::Y) = initial_pose.pose.covariance[COV_IDX::Y_Y];
         P(IDX::YAW, IDX::YAW) = initial_pose.pose.covariance[COV_IDX::YAW_YAW];
-
-        if (params_.enable_yaw_bias_estimation) {
-            P(IDX::YAWB, IDX::YAWB) = 0.0001;
-        }
         P(IDX::VX, IDX::VX) = 0.01;
         P(IDX::VY, IDX::VY) = 0.01;
         P(IDX::WZ, IDX::WZ) = 0.01;
@@ -89,28 +81,16 @@ public:
         kalman_filter_.init(X, P, params_.extend_state_step);
     }
 
-    geometry_msgs::msg::PoseStamped getCurrentPose(const rclcpp::Time& current_time, bool get_biased_yaw) const
+    geometry_msgs::msg::PoseStamped getCurrentPose(const rclcpp::Time& current_time) const
     {
         const double x = kalman_filter_.getXelement(IDX::X);
         const double y = kalman_filter_.getXelement(IDX::Y);
-        /*
-          getXelement(IDX::YAW) is surely `biased_yaw`.
-          Please note how `yaw` and `yaw_bias` are used in the state transition model and
-          how the observed pose is handled in the measurement pose update.
-        */
-        const double biased_yaw = kalman_filter_.getXelement(IDX::YAW);
-        const double yaw_bias = kalman_filter_.getXelement(IDX::YAWB);
-        const double yaw = biased_yaw + yaw_bias;
+        const double yaw = kalman_filter_.getXelement(IDX::YAW);
 
         Pose current_ekf_pose;
         current_ekf_pose.header.frame_id = params_.pose_frame_id;
         current_ekf_pose.header.stamp = current_time;
-        if (get_biased_yaw) {
-            current_ekf_pose.pose = make_pose(x, y, biased_yaw);
-        }
-        else {
-            current_ekf_pose.pose = make_pose(x, y, yaw);
-        }
+        current_ekf_pose.pose = make_pose(x, y, yaw);
         return current_ekf_pose;
     }
     geometry_msgs::msg::TwistStamped getCurrentTwist(const rclcpp::Time& current_time) const
@@ -127,7 +107,6 @@ public:
         current_ekf_twist.twist.angular.z = wz;
         return current_ekf_twist;
     }
-    double getYawBias() const { return kalman_filter_.getLatestX()(IDX::YAWB); }
     std::array<double, 36> getCurrentPoseCovariance() const { return ekfCovarianceToPoseMessageCovariance(kalman_filter_.getLatestP()); }
     std::array<double, 36> getCurrentTwistCovariance() const { return ekfCovarianceToTwistMessageCovariance(kalman_filter_.getLatestP()); }
 
@@ -181,9 +160,9 @@ public:
         const double proc_cov_wz_d = std::pow(params_.proc_stddev_wz_c * dt, 2.0);
         const double proc_cov_yaw_d = std::pow(params_.proc_stddev_yaw_c * dt, 2.0);
 
-        const Vector7d X_next = predictNextState(X_curr, dt);
-        const Matrix7d A = createStateTransitionMatrix(X_curr, dt);
-        const Matrix7d Q = processNoiseCovariance(proc_cov_yaw_d, proc_cov_vx_d, proc_cov_vy_d, proc_cov_wz_d);
+        const Vector6d X_next = predictNextState(X_curr, dt);
+        const Matrix6d A = createStateTransitionMatrix(X_curr, dt);
+        const Matrix6d Q = processNoiseCovariance(proc_cov_yaw_d, proc_cov_vx_d, proc_cov_vy_d, proc_cov_wz_d);
         kalman_filter_.predictWithDelay(X_next, A, Q);
     }
 
@@ -244,7 +223,7 @@ public:
         DEBUG_PRINT_MAT(y_ekf.transpose());
         DEBUG_PRINT_MAT((y - y_ekf).transpose());
 
-        const Eigen::Matrix<double, 3, 7> C = poseMeasurementMatrix();
+        const Eigen::Matrix<double, 3, 6> C = poseMeasurementMatrix();
         const Eigen::Matrix3d R = poseMeasurementCovariance(pose.pose.covariance, params_.pose_smoothing_steps);
 
         kalman_filter_.updateWithDelay(y, C, R, delay_step);
@@ -289,7 +268,7 @@ public:
 
         const Eigen::Vector3d y_ekf(kalman_filter_.getXelement(delay_step * dim_x_ + IDX::VX), kalman_filter_.getXelement(delay_step * dim_x_ + IDX::VY), kalman_filter_.getXelement(delay_step * dim_x_ + IDX::WZ));
         const Eigen::MatrixXd P_curr = kalman_filter_.getLatestP();
-        const Eigen::MatrixXd P_y = P_curr.block(4, 4, dim_y, dim_y);
+        const Eigen::MatrixXd P_y = P_curr.block(3, 3, dim_y, dim_y);
 
         const double distance = mahalanobis(y_ekf, y, P_y);
         if (distance > params_.twist_gate_dist) {
@@ -301,7 +280,7 @@ public:
         DEBUG_PRINT_MAT(y_ekf.transpose());
         DEBUG_PRINT_MAT((y - y_ekf).transpose());
 
-        const Eigen::Matrix<double, 3, 7> C = twistMeasurementMatrix();
+        const Eigen::Matrix<double, 3, 6> C = twistMeasurementMatrix();
         const Eigen::Matrix3d R = twistMeasurementCovariance(twist.twist.covariance, params_.twist_smoothing_steps);
         kalman_filter_.updateWithDelay(y, C, R, delay_step);
 

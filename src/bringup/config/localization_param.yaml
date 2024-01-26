@@ -2,7 +2,7 @@ localization_node:
   ros__parameters:
     start_pos: [5.2 , 61.0 , 3.14]
     show_debug_info: false
-    predict_frequency: 50.0
+    predict_frequency: 25.0
     tf_rate: 10.0
     publish_tf: true
     enable_yaw_bias_estimation: true

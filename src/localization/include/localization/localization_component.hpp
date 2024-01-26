@@ -89,8 +89,6 @@ public:
         pub_odom_ = create_publisher<nav_msgs::msg::Odometry>("ekf_odom", 1);
         pub_twist_ = create_publisher<geometry_msgs::msg::TwistStamped>("ekf_twist", 1);
         pub_twist_cov_ = create_publisher<geometry_msgs::msg::TwistWithCovarianceStamped>("ekf_twist_with_covariance", 1);
-        pub_biased_pose_ = create_publisher<geometry_msgs::msg::PoseStamped>("ekf_biased_pose", 1);
-        pub_biased_pose_cov_ = create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("ekf_biased_pose_with_covariance", 1);
 
         static auto sub_initialpose = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>("initialpose", 1, [&](geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg) { ekf_module_->initialize(*msg); });
         static auto sub_pose_with_cov = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>("umap_pos", 1, [&](geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg) { pose_queue_.push(msg); });
@@ -99,6 +97,7 @@ public:
             twist_with_covariance_stamped->header = msg->header;
             twist_with_covariance_stamped->twist = msg->twist;
             twist_with_covariance_stamped->twist.covariance[XYZRPY_COV_IDX::X_X] = std::pow(params_.twist_stddev_vx_c, 2.0);
+            twist_with_covariance_stamped->twist.covariance[XYZRPY_COV_IDX::Y_Y] = std::pow(params_.twist_stddev_vy_c, 2.0);
             twist_with_covariance_stamped->twist.covariance[XYZRPY_COV_IDX::YAW_YAW] = std::pow(params_.twist_stddev_wz_c, 2.0);
             twist_queue_.push(twist_with_covariance_stamped);
         });
@@ -115,7 +114,7 @@ public:
                 transform_stamped.header.stamp = current_time;
                 transform_stamped.header.frame_id = params_.pose_frame_id;
                 transform_stamped.child_frame_id = "base_link";
-                transform_stamped.transform = make_geometry_transform(make_eigen_vector3d(ekf_module_->getCurrentPose(current_time, false).pose));
+                transform_stamped.transform = make_geometry_transform(make_eigen_vector3d(ekf_module_->getCurrentPose(current_time).pose));
                 broadcaster_.sendTransform(transform_stamped);
             });
         }
@@ -165,12 +164,11 @@ public:
                 DEBUG_INFO(get_logger(), "------------------------- end Twist -------------------------\n");
             }
 
-            const geometry_msgs::msg::PoseStamped current_ekf_pose = ekf_module_->getCurrentPose(current_time, false);
-            const geometry_msgs::msg::PoseStamped current_biased_ekf_pose = ekf_module_->getCurrentPose(current_time, true);
+            const geometry_msgs::msg::PoseStamped current_ekf_pose = ekf_module_->getCurrentPose(current_time);
             const geometry_msgs::msg::TwistStamped current_ekf_twist = ekf_module_->getCurrentTwist(current_time);
 
             /* publish ekf result */
-            publishEstimateResult(current_ekf_pose, current_biased_ekf_pose, current_ekf_twist);
+            publishEstimateResult(current_ekf_pose, current_ekf_twist);
         });
     }
 
@@ -207,11 +205,10 @@ private:
         last_predict_time_ = std::make_shared<const rclcpp::Time>(current_time);
     }
 
-    void publishEstimateResult(const geometry_msgs::msg::PoseStamped& current_ekf_pose, const geometry_msgs::msg::PoseStamped& current_biased_ekf_pose, const geometry_msgs::msg::TwistStamped& current_ekf_twist)
+    void publishEstimateResult(const geometry_msgs::msg::PoseStamped& current_ekf_pose, const geometry_msgs::msg::TwistStamped& current_ekf_twist)
     {
         /* publish latest pose */
         pub_pose_->publish(current_ekf_pose);
-        pub_biased_pose_->publish(current_biased_ekf_pose);
 
         /* publish latest pose with covariance */
         geometry_msgs::msg::PoseWithCovarianceStamped pose_cov;
@@ -220,10 +217,6 @@ private:
         pose_cov.pose.pose = current_ekf_pose.pose;
         pose_cov.pose.covariance = ekf_module_->getCurrentPoseCovariance();
         pub_pose_cov_->publish(pose_cov);
-
-        geometry_msgs::msg::PoseWithCovarianceStamped biased_pose_cov = pose_cov;
-        biased_pose_cov.pose.pose = current_biased_ekf_pose.pose;
-        pub_biased_pose_cov_->publish(biased_pose_cov);
 
         /* publish latest twist */
         pub_twist_->publish(current_ekf_twist);

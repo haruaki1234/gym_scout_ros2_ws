@@ -10,31 +10,26 @@ double normalizeYaw(const double& yaw) { return std::atan2(std::sin(yaw), std::c
 
 /*  == Nonlinear model ==
  *
- * x_{k+1}   = x_k + (vx_k * cos(yaw_k + b_k) - vy_k * sin(yaw_k + b_k)) * dt
- * y_{k+1}   = y_k + (vx_k * sin(yaw_k + b_k) + vy_k * cos(yaw_k + b_k)) * dt
+ * x_{k+1}   = x_k + (vx_k * cos(yaw_k) - vy_k * sin(yaw_k)) * dt
+ * y_{k+1}   = y_k + (vx_k * sin(yaw_k) + vy_k * cos(yaw_k)) * dt
  * yaw_{k+1} = yaw_k + (wz_k) * dt
- * b_{k+1}   = b_k
  * vx_{k+1}  = vx_k
  * vy_{k+1}  = vy_k
  * wz_{k+1}  = wz_k
- *
- * (b_k : yaw_bias_k)
  */
-Vector7d predictNextState(const Vector7d& X_curr, const double dt)
+Vector6d predictNextState(const Vector6d& X_curr, const double dt)
 {
     const double x = X_curr(IDX::X);
     const double y = X_curr(IDX::Y);
     const double yaw = X_curr(IDX::YAW);
-    const double yaw_bias = X_curr(IDX::YAWB);
     const double vx = X_curr(IDX::VX);
     const double vy = X_curr(IDX::VY);
     const double wz = X_curr(IDX::WZ);
 
-    Vector7d X_next;
-    X_next(IDX::X) = x + (vx * std::cos(yaw + yaw_bias) - vy * std::sin(yaw + yaw_bias)) * dt; // dx = vx * cos(yaw) - vy * sin(yaw)
-    X_next(IDX::Y) = y + (vx * std::sin(yaw + yaw_bias) + vy * std::cos(yaw + yaw_bias)) * dt; // dy = vx * sin(yaw) + vy * cos(yaw)
-    X_next(IDX::YAW) = normalizeYaw(yaw + wz * dt);                                            // dyaw = omega + omega_bias
-    X_next(IDX::YAWB) = yaw_bias;
+    Vector6d X_next;
+    X_next(IDX::X) = x + (vx * std::cos(yaw) - vy * std::sin(yaw)) * dt; // dx = vx * cos(yaw) - vy * sin(yaw)
+    X_next(IDX::Y) = y + (vx * std::sin(yaw) + vy * std::cos(yaw)) * dt; // dy = vx * sin(yaw) + vy * cos(yaw)
+    X_next(IDX::YAW) = normalizeYaw(yaw + wz * dt);                      // dyaw = omega + omega_bias
     X_next(IDX::VX) = vx;
     X_next(IDX::VY) = vy;
     X_next(IDX::WZ) = wz;
@@ -43,44 +38,39 @@ Vector7d predictNextState(const Vector7d& X_curr, const double dt)
 
 /*  == Linearized model ==
  *
- * A = [ 1, 0, (-vx*sin(yaw+b)-vy*cos(yaw+b))*dt, (-vx*sin(yaw+b)-vy*cos(yaw+b))*dt, cos(yaw+b)*dt, -sin(yaw+b),   0]
- *     [ 0, 1,  (vx*cos(yaw+b)-vy*sin(yaw+b))*dt,  (vx*cos(yaw+b)-vy*sin(yaw+b))*dt, sin(yaw+b)*dt,  cos(yaw+b),   0]
- *     [ 0, 0,                                 1,                                 0,             0,           0,  dt]
- *     [ 0, 0,                                 0,                                 1,             0,           0,   0]
- *     [ 0, 0,                                 0,                                 0,             1,           0,   0]
- *     [ 0, 0,                                 0,                                 0,             0,           1,   0]
- *     [ 0, 0,                                 0,                                 0,             0,           0,   1]
+ * A = [ 1, 0, (-vx*sin(yaw)-vy*cos(yaw))*dt, cos(yaw)*dt, -sin(yaw),   0]
+ *     [ 0, 1,  (vx*cos(yaw)-vy*sin(yaw))*dt, sin(yaw)*dt,  cos(yaw),   0]
+ *     [ 0, 0,                             1,           0,         0,  dt]
+ *     [ 0, 0,                             0,           1,         0,   0]
+ *     [ 0, 0,                             0,           0,         1,   0]
+ *     [ 0, 0,                             0,           0,         0,   1]
  */
-Matrix7d createStateTransitionMatrix(const Vector7d& X_curr, const double dt)
+Matrix6d createStateTransitionMatrix(const Vector6d& X_curr, const double dt)
 {
     const double yaw = X_curr(IDX::YAW);
-    const double yaw_bias = X_curr(IDX::YAWB);
     const double vx = X_curr(IDX::VX);
     const double vy = X_curr(IDX::VY);
 
-    Matrix7d A = Matrix7d::Identity();
-    A(IDX::X, IDX::YAW) = (-vx * std::sin(yaw + yaw_bias) - vy * std::cos(yaw + yaw_bias)) * dt;
-    A(IDX::X, IDX::YAWB) = (-vx * sin(yaw + yaw_bias) - vy * std::cos(yaw + yaw_bias)) * dt;
-    A(IDX::X, IDX::VX) = std::cos(yaw + yaw_bias) * dt;
-    A(IDX::X, IDX::VY) = -std::sin(yaw + yaw_bias) * dt;
-    A(IDX::Y, IDX::YAW) = (vx * std::cos(yaw + yaw_bias) - vy * std::sin(yaw + yaw_bias)) * dt;
-    A(IDX::Y, IDX::YAWB) = (vx * std::cos(yaw + yaw_bias) - vy * std::sin(yaw + yaw_bias)) * dt;
-    A(IDX::Y, IDX::VX) = std::sin(yaw + yaw_bias) * dt;
-    A(IDX::Y, IDX::VY) = std::cos(yaw + yaw_bias) * dt;
+    Matrix6d A = Matrix6d::Identity();
+    A(IDX::X, IDX::YAW) = (-vx * std::sin(yaw) - vy * std::cos(yaw)) * dt;
+    A(IDX::X, IDX::VX) = std::cos(yaw) * dt;
+    A(IDX::X, IDX::VY) = -std::sin(yaw) * dt;
+    A(IDX::Y, IDX::YAW) = (vx * std::cos(yaw) - vy * std::sin(yaw)) * dt;
+    A(IDX::Y, IDX::VX) = std::sin(yaw) * dt;
+    A(IDX::Y, IDX::VY) = std::cos(yaw) * dt;
     A(IDX::YAW, IDX::WZ) = dt;
     return A;
 }
 
-Matrix7d processNoiseCovariance(const double proc_cov_yaw_d, const double proc_cov_vx_d, const double proc_cov_vy_d, const double proc_cov_wz_d)
+Matrix6d processNoiseCovariance(const double proc_cov_yaw_d, const double proc_cov_vx_d, const double proc_cov_vy_d, const double proc_cov_wz_d)
 {
-    Matrix7d Q = Matrix7d::Zero();
+    Matrix6d Q = Matrix6d::Zero();
     Q(IDX::X, IDX::X) = 0.0;
     Q(IDX::Y, IDX::Y) = 0.0;
     Q(IDX::YAW, IDX::YAW) = proc_cov_yaw_d; // for yaw
-    Q(IDX::YAWB, IDX::YAWB) = 0.0;
-    Q(IDX::VX, IDX::VX) = proc_cov_vx_d; // for vx
-    Q(IDX::VY, IDX::VY) = proc_cov_vy_d; // for vy
-    Q(IDX::WZ, IDX::WZ) = proc_cov_wz_d; // for wz
+    Q(IDX::VX, IDX::VX) = proc_cov_vx_d;    // for vx
+    Q(IDX::VY, IDX::VY) = proc_cov_vy_d;    // for vy
+    Q(IDX::WZ, IDX::WZ) = proc_cov_wz_d;    // for wz
     return Q;
 }
 
