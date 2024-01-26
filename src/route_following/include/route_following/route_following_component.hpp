@@ -168,7 +168,7 @@ public:
         static auto local_path_pub = create_publisher<nav_msgs::msg::Path>("local_path", rclcpp::QoS(10).reliable());
         static auto local_target_pos_pub = create_publisher<geometry_msgs::msg::PoseStamped>("local_target_pos", rclcpp::QoS(10).reliable());
 
-        static auto localization_sub = create_subscription<nav_msgs::msg::Odometry>("localization", rclcpp::QoS(10).reliable(), [&](const nav_msgs::msg::Odometry::SharedPtr msg) {
+        static auto localization_sub = create_subscription<nav_msgs::msg::Odometry>("ekf_odom", rclcpp::QoS(10).reliable(), [&](const nav_msgs::msg::Odometry::SharedPtr msg) {
             current_pos_ = make_eigen_vector3d(msg->pose.pose);
             current_vel_ = make_eigen_vector3d(msg->twist.twist);
         });
