@@ -7,3 +7,9 @@
 [submodule "src/scout_ros2"]
 	path = src/scout_ros2
 	url = https://github.com/tlab-tut/scout_ros2.git
+[submodule "src/behavior_tree_ros2"]
+	path = src/behavior_tree_ros2
+	url = https://github.com/BehaviorTree/BehaviorTree.ROS2.git
+[submodule "src/behavior_tree_cpp"]
+	path = src/behavior_tree_cpp
+	url = https://github.com/BehaviorTree/BehaviorTree.CPP.git
