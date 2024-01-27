@@ -12,152 +12,231 @@
 #include "geometry_msgs/msg/twist_stamped.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "utils/utils.hpp"
-#include "utils/kalman_filter.hpp"
+#include "utils/stop_watch.hpp"
+#include "utils/covariance_index.hpp"
+
+#include "ekf_module.hpp"
+#include "aged_object_queue.hpp"
+
+// clang-format off
+#define PRINT_MAT(X) std::cout << #X << ":\n" << X << std::endl << std::endl
+#define DEBUG_INFO(...) {if (params_.show_debug_info) {RCLCPP_INFO(__VA_ARGS__);}}
+// clang-format on
 
 namespace tlab
 {
 
 class Localization : public rclcpp::Node {
 private:
+    const HyperParameters params_;
+
+    double ekf_dt_;
+
+    AgedObjectQueue<geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr> pose_queue_;
+    AgedObjectQueue<geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr> twist_queue_;
+
     tf2_ros::TransformBroadcaster broadcaster_;
 
-    Eigen::Vector3d odometer_pos_ = Eigen::Vector3d::Zero();
-    Eigen::Vector3d odometer_vel_ = Eigen::Vector3d::Zero();
+    StopWatch<std::chrono::milliseconds> stop_watch_;
+    std::shared_ptr<const rclcpp::Time> last_predict_time_;
 
-    Eigen::Vector3d estimate_pos_ = Eigen::Vector3d::Zero();
-    Eigen::Vector3d estimate_vel_ = Eigen::Vector3d::Zero();
+    std::unique_ptr<EKFModule> ekf_module_;
 
-    Eigen::Vector3d umap_pos_ = Eigen::Vector3d::Zero();
+    /* process noise variance for discrete model */
+    double proc_cov_yaw_d_;      //!< @brief  discrete yaw process noise
+    double proc_cov_yaw_bias_d_; //!< @brief  discrete yaw bias process noise
+    double proc_cov_vx_d_;       //!< @brief  discrete process noise in d_vx=0
+    double proc_cov_vy_d_;       //!< @brief  discrete process noise in d_vy=0
+    double proc_cov_wz_d_;       //!< @brief  discrete process noise in d_wz=0
 
-    Eigen::Vector3d initial_pos_ = Eigen::Vector3d::Zero();
-    Eigen::Vector2d reference_grid_point_ = Eigen::Vector2d::Zero();
-
-    KalmanFilter<double, 3, 3, 3> klf_;
-    rclcpp::Time position_reset_time_;
+    rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pub_pose_;
+    rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr pub_pose_cov_;
+    rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pub_odom_;
+    rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr pub_twist_;
+    rclcpp::Publisher<geometry_msgs::msg::TwistWithCovarianceStamped>::SharedPtr pub_twist_cov_;
+    rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pub_biased_pose_;
+    rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr pub_biased_pose_cov_;
 
 public:
     Localization(const rclcpp::NodeOptions& options) : Localization("", options) {}
-    Localization(const std::string& name_space = "", const rclcpp::NodeOptions& options = rclcpp::NodeOptions()) : Node("localization_node", name_space, options), broadcaster_(this)
+    Localization(const std::string& name_space = "", const rclcpp::NodeOptions& options = rclcpp::NodeOptions()) :
+        Node("localization_node", name_space, options), //
+        params_(this),                                  //
+        ekf_dt_(params_.ekf_dt),                        //
+        pose_queue_(params_.pose_smoothing_steps),      //
+        twist_queue_(params_.twist_smoothing_steps),    //
+        broadcaster_(this)                              //
     {
         using namespace std::chrono_literals;
-        position_reset_time_ = this->get_clock()->now();
 
-        declare_parameter("period", 0.01);
-        static const double PERIOD = get_parameter("period").as_double();
+        proc_cov_vx_d_ = std::pow(params_.proc_stddev_vx_c * ekf_dt_, 2.0);
+        proc_cov_vy_d_ = std::pow(params_.proc_stddev_vy_c * ekf_dt_, 2.0);
+        proc_cov_wz_d_ = std::pow(params_.proc_stddev_wz_c * ekf_dt_, 2.0);
+        proc_cov_yaw_d_ = std::pow(params_.proc_stddev_yaw_c * ekf_dt_, 2.0);
 
-        declare_parameter("start_pos", std::vector<double>{0, 0, 0});
-        auto initial_pos = get_parameter("start_pos").as_double_array();
+        ekf_module_ = std::make_unique<EKFModule>(this, params_);
 
-        declare_parameter("grid_point_observer.grid_width", 0.01);
-        static const double GRID_WIDTH = get_parameter("grid_point_observer.grid_width").as_double();
+        {
+            declare_parameter("start_pos", std::vector<double>{0, 0, 0});
+            auto initial_pos = get_parameter("start_pos").as_double_array();
+            geometry_msgs::msg::PoseWithCovarianceStamped initial_pose;
+            initial_pose.pose.pose = make_pose(initial_pos[0], initial_pos[1], initial_pos[2]);
+            ekf_module_->initialize(initial_pose);
+        }
 
-        declare_parameter("grid_point_observer.gain_xy", 0.1);
-        static const double GAIN_XY = get_parameter("grid_point_observer.gain_xy").as_double();
+        pub_pose_ = create_publisher<geometry_msgs::msg::PoseStamped>("ekf_pose", 1);
+        pub_pose_cov_ = create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("ekf_pose_with_covariance", 1);
+        pub_odom_ = create_publisher<nav_msgs::msg::Odometry>("ekf_odom", 1);
+        pub_twist_ = create_publisher<geometry_msgs::msg::TwistStamped>("ekf_twist", 1);
+        pub_twist_cov_ = create_publisher<geometry_msgs::msg::TwistWithCovarianceStamped>("ekf_twist_with_covariance", 1);
 
-        declare_parameter("grid_point_observer.gain_theta", 0.03);
-        static const double GAIN_THETA = get_parameter("grid_point_observer.gain_theta").as_double();
-
-        static auto set_position = [&](const Eigen::Vector3d& init_pos) {
-            position_reset_time_ = this->get_clock()->now();
-            initial_pos_ = init_pos;
-            initial_pos_[2] -= odometer_pos_[2];
-            Eigen::Matrix<double, 3, 3> p0 = Eigen::Matrix<double, 3, 3>::Zero();
-            klf_.reset(init_pos, p0);
-        };
-
-        static auto localization_pub = this->create_publisher<nav_msgs::msg::Odometry>("localization", rclcpp::QoS(10).reliable());
-
-        static auto odom_sub = this->create_subscription<nav_msgs::msg::Odometry>("odom", rclcpp::QoS(10).reliable(), [&](const nav_msgs::msg::Odometry::SharedPtr msg) {
-            odometer_pos_ = make_eigen_vector3d(msg->pose.pose);
-            odometer_vel_ = make_eigen_vector3d(msg->twist.twist);
+        static auto sub_initialpose = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>("initialpose", 1, [&](geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg) { ekf_module_->initialize(*msg); });
+        static auto sub_pose_with_cov = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>("umap_pos", 1, [&](geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg) { pose_queue_.push(msg); });
+        static auto sub_twist_with_cov = this->create_subscription<nav_msgs::msg::Odometry>("odom", 1, [&](nav_msgs::msg::Odometry::SharedPtr msg) {
+            auto twist_with_covariance_stamped = std::make_shared<geometry_msgs::msg::TwistWithCovarianceStamped>();
+            twist_with_covariance_stamped->header = msg->header;
+            twist_with_covariance_stamped->twist = msg->twist;
+            twist_with_covariance_stamped->twist.covariance[XYZRPY_COV_IDX::X_X] = std::pow(params_.twist_stddev_vx_c, 2.0);
+            twist_with_covariance_stamped->twist.covariance[XYZRPY_COV_IDX::Y_Y] = std::pow(params_.twist_stddev_vy_c, 2.0);
+            twist_with_covariance_stamped->twist.covariance[XYZRPY_COV_IDX::YAW_YAW] = std::pow(params_.twist_stddev_wz_c, 2.0);
+            twist_queue_.push(twist_with_covariance_stamped);
         });
 
-        set_position(Eigen::Vector3d(initial_pos[0], initial_pos[1], initial_pos[2]));
+        if (params_.publish_tf_) {
+            static auto timer_tf = this->create_wall_timer(rclcpp::Rate(params_.tf_rate_).period(), [&]() {
+                if (params_.pose_frame_id == "") {
+                    return;
+                }
 
-        klf_.F = Eigen::Vector3d::Ones().asDiagonal();
-        Eigen::Vector3d g_vec;
-        g_vec << PERIOD, PERIOD, PERIOD;
-        klf_.G = g_vec.asDiagonal();
-        klf_.H = Eigen::Vector3d::Ones().asDiagonal();
+                const rclcpp::Time current_time = this->get_clock()->now();
 
-        Eigen::Vector3d q_vec;
-        q_vec << 0.01, 0.01, 0.01;
-        klf_.Q = q_vec.asDiagonal();
-
-        Eigen::Vector3d r_vec;
-        r_vec << 0.0001, 0.0001, 0.0001;
-        klf_.R = r_vec.asDiagonal();
-
-        static auto set_pose = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>("/initialpose", rclcpp::QoS(10).reliable(), [&](geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg) { set_position(make_eigen_vector3d(msg->pose.pose)); });
-
-        static auto umap_pos = this->create_subscription<geometry_msgs::msg::PoseStamped>("umap_pos", rclcpp::QoS(10).reliable(), [&](const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
-            if (this->get_clock()->now().seconds() - position_reset_time_.seconds() < 0.2) {
-                return;
-            }
-            umap_pos_ = make_eigen_vector3d(msg->pose);
-            umap_pos_ += estimate_vel_ * static_cast<double>(this->get_clock()->now().seconds() - rclcpp::Time(msg->header.stamp).seconds());
-
-            // 格子点オブザーバ
-            // 基準格子点更新
-            auto old_grid_point = reference_grid_point_;
-            reference_grid_point_.x() = std::floor(odometer_pos_.x() / GRID_WIDTH + 0.5) * GRID_WIDTH;
-            reference_grid_point_.y() = std::floor(odometer_pos_.y() / GRID_WIDTH + 0.5) * GRID_WIDTH;
-            auto initial_pos_xy = initial_pos_.head<2>() - rotate_2d(old_grid_point, initial_pos_.z()) + rotate_2d(reference_grid_point_, initial_pos_.z());
-            initial_pos_.head<2>() = initial_pos_xy;
-
-            Eigen::Vector2d q = odometer_pos_.head<2>() - reference_grid_point_;
-            q = rotate_2d(q, initial_pos_.z());
-            for (size_t i = 0; i < 2; i++) {
-                initial_pos_[i] -= GAIN_XY * (q[i] + initial_pos_[i] - umap_pos_[i]);
-            }
-            initial_pos_[2] = normalize_angle(initial_pos_[2] - GAIN_THETA * normalize_angle(odometer_pos_[2] + initial_pos_[2] - umap_pos_[2]));
-        });
-
-        static auto timer = this->create_wall_timer(1s * PERIOD, [&]() {
-            // 格子点オブザーバ
-            // 基準格子点更新
-            auto old_grid_point = reference_grid_point_;
-            reference_grid_point_.x() = std::floor(odometer_pos_.x() / GRID_WIDTH + 0.5) * GRID_WIDTH;
-            reference_grid_point_.y() = std::floor(odometer_pos_.y() / GRID_WIDTH + 0.5) * GRID_WIDTH;
-            initial_pos_.head<2>() = initial_pos_.head<2>() - rotate_2d(old_grid_point, initial_pos_.z()) + rotate_2d(reference_grid_point_, initial_pos_.z());
-            Eigen::Vector2d q = odometer_pos_.head<2>() - reference_grid_point_;
-            q = rotate_2d(q, initial_pos_.z());
-            for (int i = 0; i < 2; i++) {
-                estimate_pos_[i] = initial_pos_[i] + q[i];
-            }
-            estimate_pos_[2] = normalize_angle(initial_pos_[2] + odometer_pos_[2]);
-            estimate_vel_.head<2>() = rotate_2d(odometer_vel_.head<2>(), estimate_pos_.z());
-            estimate_vel_.z() = odometer_vel_.z();
-
-            estimate_pos_ = klf_.filtering(estimate_vel_, estimate_pos_);
-
-            {
-                nav_msgs::msg::Odometry localization_msg;
-                localization_msg.header.frame_id = "map";
-                localization_msg.header.stamp = this->get_clock()->now();
-                localization_msg.pose.pose = make_pose(estimate_pos_);
-                localization_msg.twist.twist = make_twist(estimate_vel_);
-                localization_pub->publish(localization_msg);
-            }
-
-            {
                 geometry_msgs::msg::TransformStamped transform_stamped;
-                transform_stamped.header.stamp = this->get_clock()->now();
-                transform_stamped.header.frame_id = "map";
-                transform_stamped.child_frame_id = "initial_pos";
-                transform_stamped.transform = make_geometry_transform(initial_pos_ - Eigen::Vector3d(reference_grid_point_.x(), reference_grid_point_.y(), 0));
-                broadcaster_.sendTransform(transform_stamped);
-            }
-
-            {
-                geometry_msgs::msg::TransformStamped transform_stamped;
-                transform_stamped.header.stamp = this->get_clock()->now();
-                transform_stamped.header.frame_id = "map";
+                transform_stamped.header.stamp = current_time;
+                transform_stamped.header.frame_id = params_.pose_frame_id;
                 transform_stamped.child_frame_id = "base_link";
-                transform_stamped.transform = make_geometry_transform(estimate_pos_);
+                transform_stamped.transform = make_geometry_transform(make_eigen_vector3d(ekf_module_->getCurrentPose(current_time).pose));
                 broadcaster_.sendTransform(transform_stamped);
+            });
+        }
+
+        static auto timer_control = this->create_wall_timer(1s * ekf_dt_, [&]() {
+            const rclcpp::Time current_time = this->now();
+
+            DEBUG_INFO(get_logger(), "========================= timer called =========================");
+
+            /* update predict frequency with measured timer rate */
+            updatePredictFrequency(current_time);
+
+            /* predict model in EKF */
+            stop_watch_.tic();
+            DEBUG_INFO(get_logger(), "------------------------- start prediction -------------------------");
+            ekf_module_->predictWithDelay(ekf_dt_);
+            DEBUG_INFO(get_logger(), "[EKF] predictKinematicsModel calc time = %f [ms]", stop_watch_.toc());
+            DEBUG_INFO(get_logger(), "------------------------- end prediction -------------------------\n");
+
+            if (!pose_queue_.empty()) {
+                DEBUG_INFO(get_logger(), "------------------------- start Pose -------------------------");
+                stop_watch_.tic();
+
+                // save the initial size because the queue size can change in the loop
+                const auto t_curr = current_time;
+                const size_t n = pose_queue_.size();
+                for (size_t i = 0; i < n; ++i) {
+                    const auto pose = pose_queue_.pop_increment_age();
+                    ekf_module_->measurementUpdatePose(*pose, t_curr);
+                }
+                DEBUG_INFO(get_logger(), "[EKF] measurementUpdatePose calc time = %f [ms]", stop_watch_.toc());
+                DEBUG_INFO(get_logger(), "------------------------- end Pose -------------------------\n");
             }
+
+            if (!twist_queue_.empty()) {
+                DEBUG_INFO(get_logger(), "------------------------- start Twist -------------------------");
+                stop_watch_.tic();
+
+                // save the initial size because the queue size can change in the loop
+                const auto t_curr = current_time;
+                const size_t n = twist_queue_.size();
+                for (size_t i = 0; i < n; ++i) {
+                    const auto twist = twist_queue_.pop_increment_age();
+                    ekf_module_->measurementUpdateTwist(*twist, t_curr);
+                }
+                DEBUG_INFO(get_logger(), "[EKF] measurementUpdateTwist calc time = %f [ms]", stop_watch_.toc());
+                DEBUG_INFO(get_logger(), "------------------------- end Twist -------------------------\n");
+            }
+
+            const geometry_msgs::msg::PoseStamped current_ekf_pose = ekf_module_->getCurrentPose(current_time);
+            const geometry_msgs::msg::TwistStamped current_ekf_twist = ekf_module_->getCurrentTwist(current_time);
+
+            /* publish ekf result */
+            publishEstimateResult(current_ekf_pose, current_ekf_twist);
         });
+    }
+
+private:
+    void updatePredictFrequency(const rclcpp::Time& current_time)
+    {
+        if (last_predict_time_) {
+            if (current_time < *last_predict_time_) {
+                RCLCPP_WARN(get_logger(), "Detected jump back in time");
+            }
+            else {
+                /* Measure dt */
+                ekf_dt_ = (current_time - *last_predict_time_).seconds();
+                DEBUG_INFO(get_logger(), "[EKF] update ekf_dt_ to %f seconds (= %f hz)", ekf_dt_, 1 / ekf_dt_);
+
+                if (ekf_dt_ > 10.0) {
+                    ekf_dt_ = 10.0;
+                    RCLCPP_WARN(get_logger(), "Large ekf_dt_ detected!! (%f sec) Capped to 10.0 seconds", ekf_dt_);
+                }
+                else if (ekf_dt_ > params_.pose_smoothing_steps / params_.ekf_rate) {
+                    RCLCPP_WARN(get_logger(), "EKF period may be too slow to finish pose smoothing!! (%f sec) ", ekf_dt_);
+                }
+
+                /* Register dt and accumulate time delay */
+                ekf_module_->accumulate_delay_time(ekf_dt_);
+
+                /* Update discrete proc_cov*/
+                proc_cov_vx_d_ = std::pow(params_.proc_stddev_vx_c * ekf_dt_, 2.0);
+                proc_cov_vy_d_ = std::pow(params_.proc_stddev_vy_c * ekf_dt_, 2.0);
+                proc_cov_wz_d_ = std::pow(params_.proc_stddev_wz_c * ekf_dt_, 2.0);
+                proc_cov_yaw_d_ = std::pow(params_.proc_stddev_yaw_c * ekf_dt_, 2.0);
+            }
+        }
+        last_predict_time_ = std::make_shared<const rclcpp::Time>(current_time);
+    }
+
+    void publishEstimateResult(const geometry_msgs::msg::PoseStamped& current_ekf_pose, const geometry_msgs::msg::TwistStamped& current_ekf_twist)
+    {
+        /* publish latest pose */
+        pub_pose_->publish(current_ekf_pose);
+
+        /* publish latest pose with covariance */
+        geometry_msgs::msg::PoseWithCovarianceStamped pose_cov;
+        pose_cov.header.stamp = current_ekf_pose.header.stamp;
+        pose_cov.header.frame_id = current_ekf_pose.header.frame_id;
+        pose_cov.pose.pose = current_ekf_pose.pose;
+        pose_cov.pose.covariance = ekf_module_->getCurrentPoseCovariance();
+        pub_pose_cov_->publish(pose_cov);
+
+        /* publish latest twist */
+        pub_twist_->publish(current_ekf_twist);
+
+        /* publish latest twist with covariance */
+        geometry_msgs::msg::TwistWithCovarianceStamped twist_cov;
+        twist_cov.header.stamp = current_ekf_twist.header.stamp;
+        twist_cov.header.frame_id = current_ekf_twist.header.frame_id;
+        twist_cov.twist.twist = current_ekf_twist.twist;
+        twist_cov.twist.covariance = ekf_module_->getCurrentTwistCovariance();
+        pub_twist_cov_->publish(twist_cov);
+
+        /* publish latest odometry */
+        nav_msgs::msg::Odometry odometry;
+        odometry.header.stamp = current_ekf_pose.header.stamp;
+        odometry.header.frame_id = current_ekf_pose.header.frame_id;
+        odometry.child_frame_id = "base_link";
+        odometry.pose = pose_cov.pose;
+        odometry.twist = twist_cov.twist;
+        pub_odom_->publish(odometry);
     }
 };
 

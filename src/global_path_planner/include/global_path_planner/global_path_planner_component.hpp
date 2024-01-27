@@ -85,7 +85,7 @@ public:
         grid_msg_.cell_height = resolution_;
         grid_pub->publish(grid_msg_);
 
-        static auto localization_sub = create_subscription<nav_msgs::msg::Odometry>("localization", rclcpp::QoS(10).reliable(), [&](const nav_msgs::msg::Odometry::SharedPtr msg) { current_pos_ = make_eigen_vector3d(msg->pose.pose); });
+        static auto localization_sub = create_subscription<nav_msgs::msg::Odometry>("ekf_odom", rclcpp::QoS(10).reliable(), [&](const nav_msgs::msg::Odometry::SharedPtr msg) { current_pos_ = make_eigen_vector3d(msg->pose.pose); });
 
         static auto goal_sub = this->create_subscription<geometry_msgs::msg::PoseStamped>("goal_pose", rclcpp::QoS(10).reliable(), [&](const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
             auto goal = to_grid(Eigen::Vector2d(msg->pose.position.x, msg->pose.position.y));

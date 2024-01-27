@@ -11,6 +11,7 @@
 
 #include "utils/utils.hpp"
 #include "utils/velocity_limit_filter.hpp"
+#include "utils/covariance_index.hpp"
 
 namespace tlab
 {
@@ -32,7 +33,6 @@ private:
     Eigen::Vector3d current_pos_;
     Eigen::Vector3d current_vel_;
 
-    Eigen::Vector3d localization_vel_;
     Eigen::Vector3d localization_pos_;
 
     std::optional<rclcpp::Time> umap_request_time_ = std::nullopt;
@@ -102,6 +102,8 @@ public:
         static std::normal_distribution<> umap_pos_y_dist(get_parameter("umap_pos_y_mean").as_double(), get_parameter("umap_pos_y_stddev").as_double());
         static std::normal_distribution<> umap_pos_th_dist(get_parameter("umap_pos_yaw_mean").as_double(), get_parameter("umap_pos_yaw_stddev").as_double());
 
+        static std::uniform_real_distribution<> rand_01(0.0, 1.0);
+
         static ClampVelLimitFilter vx_filter(-max_vel_, max_vel_, max_acc_, dt_);
         static ClampVelLimitFilter vy_filter(-max_vel_, max_vel_, max_acc_, dt_);
         static ClampVelLimitFilter vth_filter(-max_ang_vel_, max_ang_vel_, max_ang_acc_, dt_);
@@ -112,7 +114,7 @@ public:
         static auto truth_odom_pub = create_publisher<nav_msgs::msg::Odometry>("truth_odom", rclcpp::QoS(10).reliable());
         static auto odom_pub = create_publisher<nav_msgs::msg::Odometry>("odom", rclcpp::QoS(10).reliable());
 
-        static auto umap_pos_pub = create_publisher<geometry_msgs::msg::PoseStamped>("umap_pos", rclcpp::QoS(10).reliable());
+        static auto umap_pos_pub = create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("umap_pos", rclcpp::QoS(10).reliable());
 
         static auto set_pose = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>("/initialpose", rclcpp::QoS(10).reliable(), [&](geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg) {
             initial_pos_ = make_eigen_vector3d(msg->pose.pose);
@@ -125,14 +127,15 @@ public:
             vth_filter.set_input(msg->angular.z);
         });
 
-        static auto localization_sub = create_subscription<nav_msgs::msg::Odometry>("localization", rclcpp::QoS(10).reliable(), [&](const nav_msgs::msg::Odometry::SharedPtr msg) {
-            localization_pos_ = make_eigen_vector3d(msg->pose.pose);
-            localization_vel_ = make_eigen_vector3d(msg->twist.twist);
-        });
+        static auto localization_sub = create_subscription<nav_msgs::msg::Odometry>("ekf_odom", rclcpp::QoS(10).reliable(), [&](const nav_msgs::msg::Odometry::SharedPtr msg) { localization_pos_ = make_eigen_vector3d(msg->pose.pose); });
 
         static auto umap_sim_timer = create_wall_timer(1s * umap_request_period_, [&]() {
             umap_localization_pos_ = localization_pos_;
             umap_pos_ = truth_pos_;
+            // double outlier_gain = 1.0;
+            // if (rand_01(engine) < 0.1) {
+            //     outlier_gain = 20.0;
+            // }
             umap_pos_.x() += umap_pos_x_dist(engine);
             umap_pos_.y() += umap_pos_y_dist(engine);
             umap_pos_.z() += umap_pos_th_dist(engine);
@@ -142,14 +145,17 @@ public:
 
         static auto timer = create_wall_timer(1s * dt_, [&]() {
             if (umap_request_time_ && this->get_clock()->now().seconds() - umap_request_time_.value().seconds() > umap_localization_delay_) {
-                auto localization_diff = localization_pos_ - umap_localization_pos_;
-                umap_pos_.head<2>() += rotate_2d(localization_diff.head<2>(), umap_pos_.z() - umap_localization_pos_.z());
-                umap_pos_.z() += localization_diff.z();
+                // auto localization_diff = localization_pos_ - umap_localization_pos_;
+                // umap_pos_.head<2>() += rotate_2d(localization_diff.head<2>(), umap_pos_.z() - umap_localization_pos_.z());
+                // umap_pos_.z() += localization_diff.z();
 
-                geometry_msgs::msg::PoseStamped umap_pos_msg;
+                geometry_msgs::msg::PoseWithCovarianceStamped umap_pos_msg;
                 umap_pos_msg.header.frame_id = "map";
-                umap_pos_msg.header.stamp = this->get_clock()->now();
-                umap_pos_msg.pose = make_pose(umap_pos_);
+                umap_pos_msg.header.stamp = *umap_request_time_;
+                umap_pos_msg.pose.pose = make_pose(umap_pos_);
+                umap_pos_msg.pose.covariance[XYZRPY_COV_IDX::X_X] = get_parameter("umap_pos_x_stddev").as_double();
+                umap_pos_msg.pose.covariance[XYZRPY_COV_IDX::Y_Y] = get_parameter("umap_pos_y_stddev").as_double();
+                umap_pos_msg.pose.covariance[XYZRPY_COV_IDX::YAW_YAW] = get_parameter("umap_pos_yaw_stddev").as_double();
                 umap_pos_pub->publish(umap_pos_msg);
 
                 umap_request_time_ = std::nullopt;

@@ -1,6 +1,6 @@
 route_following_node:
   ros__parameters:
-    control_period: 0.1
+    control_period: 0.2
     max_vel: 0.5
     max_acc: 1.0
     max_ang_vel: 1.5
