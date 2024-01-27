@@ -18,6 +18,7 @@
 #include "utils/math_util.hpp"
 #include "utils/golden_search.hpp"
 #include "utils/kd_tree.hpp"
+#include "utils/covariance_index.hpp"
 
 namespace tlab
 {
@@ -81,6 +82,7 @@ private:
 
     Eigen::Vector3d current_vel_;
     Eigen::Vector3d current_pos_;
+    double covariance_norm_;
 
     std::vector<geometry_msgs::msg::PoseStamped> global_path_;
     Eigen::Vector3d local_target_pos_;
@@ -89,9 +91,12 @@ private:
     int near_index_ = 0;
 
     double control_period_;
+    double covariance_gain_;
     double max_vel_;
+    double minimum_max_vel_;
     double max_acc_;
     double max_angle_vel_;
+    double minimum_max_angle_vel_;
     double max_angle_acc_;
     int vel_split_num_;
     double simulation_time_;
@@ -120,12 +125,18 @@ public:
 
         declare_parameter<double>("control_period", 0.1);
         control_period_ = get_parameter("control_period").as_double();
+        declare_parameter<double>("covariance_gain", 1.0);
+        covariance_gain_ = get_parameter("covariance_gain").as_double();
         declare_parameter<double>("max_vel", 1.0);
         max_vel_ = get_parameter("max_vel").as_double();
+        declare_parameter<double>("minimum_max_vel", 0.1);
+        minimum_max_vel_ = get_parameter("minimum_max_vel").as_double();
         declare_parameter<double>("max_acc", 1.0);
         max_acc_ = get_parameter("max_acc").as_double();
         declare_parameter<double>("max_angle_vel", 1.0);
         max_angle_vel_ = get_parameter("max_angle_vel").as_double();
+        declare_parameter<double>("minimum_max_angle_vel", 0.1);
+        minimum_max_angle_vel_ = get_parameter("minimum_max_angle_vel").as_double();
         declare_parameter<double>("max_angle_acc", 1.0);
         max_angle_acc_ = get_parameter("max_angle_acc").as_double();
         declare_parameter<int>("vel_split_num", 10);
@@ -172,6 +183,7 @@ public:
             current_pos_ = make_eigen_vector3d(msg->pose.pose);
             current_vel_ = make_eigen_vector3d(msg->twist.twist);
             current_vel_.head<2>() = rotate_2d(current_vel_.head<2>(), current_pos_.z());
+            covariance_norm_ = std::hypot(msg->pose.covariance[XYZRPY_COV_IDX::X_X], msg->pose.covariance[XYZRPY_COV_IDX::Y_Y], msg->pose.covariance[XYZRPY_COV_IDX::YAW_YAW]);
         });
         static auto global_path_sub = create_subscription<nav_msgs::msg::Path>("global_path", rclcpp::QoS(10).reliable(), [&](const nav_msgs::msg::Path::SharedPtr msg) {
             global_path_ = msg->poses;
@@ -224,6 +236,7 @@ public:
                         near_index_ = i;
                     }
                 }
+                double max_vel = std::max(max_vel_ / (1 + covariance_gain_ * covariance_norm_), minimum_max_vel_);
                 int target_index = near_index_;
                 double route_distance = 0;
                 auto prev_pos = Eigen::Vector2d(global_path_[near_index_].pose.position.x, global_path_[near_index_].pose.position.y);
@@ -232,7 +245,7 @@ public:
                     route_distance += (pos - prev_pos).norm();
                     prev_pos = pos;
                     target_index = i;
-                    if (route_distance >= max_vel_ * simulation_time_) {
+                    if (route_distance >= max_vel * simulation_time_) {
                         break;
                     }
                 }
@@ -307,22 +320,22 @@ private:
     }
     std::vector<local_path_data_t> make_choices_path() const
     {
+        double max_vel = std::max(max_vel_ / (1 + covariance_gain_ * covariance_norm_), minimum_max_vel_);
+        std::cout << max_vel << std::endl;
+        double max_angle_vel = std::max(max_angle_vel_ / (1 + covariance_gain_ * covariance_norm_), minimum_max_angle_vel_);
         auto rotate_vel = rotate_2d(current_vel_.head<2>(), -current_pos_.z());
-        double range_min_x = std::max(rotate_vel.x() - max_acc_ * control_period_, -max_vel_);
-        double range_max_x = std::min(rotate_vel.x() + max_acc_ * control_period_, max_vel_);
-        double range_min_y = std::max(rotate_vel.y() - max_acc_ * control_period_, -max_vel_);
-        double range_max_y = std::min(rotate_vel.y() + max_acc_ * control_period_, max_vel_);
-        double range_min_z = std::max(current_vel_.z() - max_angle_acc_ * control_period_, -max_angle_vel_);
-        double range_max_z = std::min(current_vel_.z() + max_angle_acc_ * control_period_, max_angle_vel_);
-
         std::vector<local_path_data_t> choices_path;
-        for (int i = 0; i <= vel_split_num_; i++) {
-            double x = range_min_x + (range_max_x - range_min_x) / vel_split_num_ * i;
-            for (int j = 0; j <= vel_split_num_; j++) {
-                double y = range_min_y + (range_max_y - range_min_y) / vel_split_num_ * j;
-                for (int k = 0; k <= vel_split_num_; k++) {
-                    double z = range_min_z + (range_max_z - range_min_z) / vel_split_num_ * k;
-                    choices_path.push_back(local_path_data_t(Eigen::Vector3d(x, y, z), simulation_pos(Eigen::Vector3d(x, y, z), current_pos_)));
+        int half_vel_split_num = vel_split_num_ / 2;
+        for (int i = -half_vel_split_num; i < half_vel_split_num; i++) {
+            double x = rotate_vel.x() + max_acc_ * control_period_ / half_vel_split_num * i;
+            for (int j = -half_vel_split_num; j < half_vel_split_num; j++) {
+                double y = rotate_vel.y() + max_acc_ * control_period_ / half_vel_split_num * j;
+                for (int k = -half_vel_split_num; k < half_vel_split_num; k++) {
+                    double z = current_vel_.z() + max_angle_acc_ * control_period_ / half_vel_split_num * k;
+                    if ((std::hypot(x, y) <= max_vel && std::abs(z) <= max_angle_vel) || (std::hypot(x, y) < rotate_vel.norm() && std::abs(z) < std::abs(current_vel_.z()))) {
+                        choices_path.push_back(local_path_data_t(Eigen::Vector3d(x, y, z), simulation_pos(Eigen::Vector3d(x, y, z), current_pos_)));
+                        std::cout << x << ", " << y << ", " << z << std::endl;
+                    }
                 }
             }
         }
