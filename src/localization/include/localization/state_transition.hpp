@@ -52,10 +52,10 @@ Matrix6d createStateTransitionMatrix(const Vector6d& X_curr, const double dt)
     const double vy = X_curr(IDX::VY);
 
     Matrix6d A = Matrix6d::Identity();
-    A(IDX::X, IDX::YAW) = (-vx * std::sin(yaw) - vy * std::cos(yaw)) * dt;
+    A(IDX::X, IDX::YAW) = (vx * std::cos(yaw) - vy * std::sin(yaw)) * dt;
     A(IDX::X, IDX::VX) = std::cos(yaw) * dt;
     A(IDX::X, IDX::VY) = -std::sin(yaw) * dt;
-    A(IDX::Y, IDX::YAW) = (vx * std::cos(yaw) - vy * std::sin(yaw)) * dt;
+    A(IDX::Y, IDX::YAW) = (vx * std::sin(yaw) + vy * std::cos(yaw)) * dt;
     A(IDX::Y, IDX::VX) = std::sin(yaw) * dt;
     A(IDX::Y, IDX::VY) = std::cos(yaw) * dt;
     A(IDX::YAW, IDX::WZ) = dt;

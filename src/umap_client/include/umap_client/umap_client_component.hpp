@@ -8,6 +8,7 @@
 #include <Eigen/Dense>
 
 #include "utils/utils.hpp"
+#include "utils/covariance_index.hpp"
 
 #include "umap_image_sender.hpp"
 
@@ -61,9 +62,13 @@ public:
         declare_parameter("umap_matching_angle_distance", -1.0);
         static double umap_matching_angle_distance = get_parameter("umap_matching_angle_distance").as_double();
 
+        declare_parameter<double>("umap_pos_x_stddev", 0.01);
+        declare_parameter<double>("umap_pos_y_stddev", 0.01);
+        declare_parameter<double>("umap_pos_yaw_stddev", 0.01);
+
         static umap::UmapImageSender umap_image_sender(get_parameter("server_ip").as_string(), get_parameter("server_port").as_int(), get_parameter("device_id").as_string(), get_parameter("camera_number").as_int());
 
-        static auto umap_pos_pub = create_publisher<geometry_msgs::msg::PoseStamped>("umap_pos", rclcpp::QoS(10).reliable());
+        static auto umap_pos_pub = create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("umap_pos", rclcpp::QoS(10).reliable());
 
         static auto image_sub = this->create_subscription<sensor_msgs::msg::Image>("/image", rclcpp::QoS(rclcpp::KeepLast(3)), [&](sensor_msgs::msg::Image::SharedPtr msg) {
             image_msg_ = msg;
@@ -99,16 +104,31 @@ public:
             auto umap_result = umap_image_sender.send_from_mat(canny_img, umap::UmapImageSender::pose_t(take_picture_pos.x(), take_picture_pos.y(), 0, 0, 0, take_picture_pos.z()), umap_matching_distance, umap_matching_angle_distance);
             if (umap_result) {
                 auto umap_pos = Eigen::Vector3d(umap_result->pose.x, umap_result->pose.y, umap_result->pose.yaw);
-                // auto localization_diff = current_pos_ - take_picture_pos;
-                // umap_pos.head<2>() += rotate_2d(localization_diff.head<2>(), umap_pos.z() - take_picture_pos.z());
-                // umap_pos.z() += localization_diff.z();
-                umap_pos.z() -= offset_pos.z();
-                umap_pos.head<2>() -= rotate_2d(offset_pos.head<2>(), umap_pos.z());
 
-                geometry_msgs::msg::PoseStamped umap_pos_msg;
+                geometry_msgs::msg::PoseWithCovarianceStamped umap_pos_msg;
                 umap_pos_msg.header.frame_id = "map";
-                umap_pos_msg.header.stamp = take_picture_time;
-                umap_pos_msg.pose = make_pose(umap_pos);
+                if (auto now = this->get_clock()->now(); (now - take_picture_time).seconds() > 1.0) {
+                    auto localization_diff = current_pos_ - take_picture_pos;
+                    umap_pos.head<2>() += rotate_2d(localization_diff.head<2>(), umap_pos.z() - take_picture_pos.z());
+                    umap_pos.z() += localization_diff.z();
+                    umap_pos.z() -= offset_pos.z();
+                    umap_pos.head<2>() -= rotate_2d(offset_pos.head<2>(), umap_pos.z());
+                    umap_pos_msg.header.stamp = now;
+                    umap_pos_msg.pose.pose = make_pose(umap_pos);
+                    umap_pos_msg.pose.covariance[XYZRPY_COV_IDX::X_X] = get_parameter("umap_pos_x_stddev").as_double() * 2;
+                    umap_pos_msg.pose.covariance[XYZRPY_COV_IDX::Y_Y] = get_parameter("umap_pos_y_stddev").as_double() * 2;
+                    umap_pos_msg.pose.covariance[XYZRPY_COV_IDX::YAW_YAW] = get_parameter("umap_pos_yaw_stddev").as_double() * 2;
+                }
+                else {
+                    umap_pos.z() -= offset_pos.z();
+                    umap_pos.head<2>() -= rotate_2d(offset_pos.head<2>(), umap_pos.z());
+                    umap_pos_msg.header.stamp = take_picture_time;
+                    umap_pos_msg.pose.pose = make_pose(umap_pos);
+                    umap_pos_msg.pose.covariance[XYZRPY_COV_IDX::X_X] = get_parameter("umap_pos_x_stddev").as_double();
+                    umap_pos_msg.pose.covariance[XYZRPY_COV_IDX::Y_Y] = get_parameter("umap_pos_y_stddev").as_double();
+                    umap_pos_msg.pose.covariance[XYZRPY_COV_IDX::YAW_YAW] = get_parameter("umap_pos_yaw_stddev").as_double();
+                }
+
                 umap_pos_pub->publish(umap_pos_msg);
             }
         });
