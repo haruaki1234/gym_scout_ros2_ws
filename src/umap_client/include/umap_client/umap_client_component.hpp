@@ -19,6 +19,7 @@ class UmapClient : public rclcpp::Node {
 private:
     sensor_msgs::msg::Image::SharedPtr image_msg_;
     Eigen::Vector3d current_pos_;
+    double covariance_norm_;
 
     Eigen::Vector3d take_picture_pos_;
     rclcpp::Time take_picture_time_;
@@ -44,6 +45,7 @@ public:
         declare_parameter("server_port", 50000);
         declare_parameter("device_id", "TB01");
         declare_parameter("camera_number", 1);
+        declare_parameter("dead_time_ms", 1000);
 
         declare_parameter("resize_width", 320);
         declare_parameter("resize_height", 240);
@@ -57,6 +59,9 @@ public:
         declare_parameter("umap_request_minimum_pixel_rate", 0.0);
         static double umap_request_minimum_pixel_rate = get_parameter("umap_request_minimum_pixel_rate").as_double();
 
+        declare_parameter("umap_matching_distance_covariance_gain", 1.0);
+        static double umap_matching_distance_covariance_gain = get_parameter("umap_matching_distance_covariance_gain").as_double();
+
         declare_parameter("umap_matching_distance", -1.0);
         static double umap_matching_distance = get_parameter("umap_matching_distance").as_double();
         declare_parameter("umap_matching_angle_distance", -1.0);
@@ -67,6 +72,7 @@ public:
         declare_parameter<double>("umap_pos_yaw_stddev", 0.01);
 
         static umap::UmapImageSender umap_image_sender(get_parameter("server_ip").as_string(), get_parameter("server_port").as_int(), get_parameter("device_id").as_string(), get_parameter("camera_number").as_int());
+        umap_image_sender.dead_time_ms = get_parameter("dead_time_ms").as_int();
 
         static auto umap_pos_pub = create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("umap_pos", rclcpp::QoS(10).reliable());
 
@@ -75,7 +81,10 @@ public:
             take_picture_pos_ = current_pos_;
             take_picture_time_ = this->get_clock()->now();
         });
-        static auto localization_sub = create_subscription<nav_msgs::msg::Odometry>("ekf_odom", rclcpp::QoS(10).reliable(), [&](const nav_msgs::msg::Odometry::SharedPtr msg) { current_pos_ = make_eigen_vector3d(msg->pose.pose); });
+        static auto localization_sub = create_subscription<nav_msgs::msg::Odometry>("ekf_odom", rclcpp::QoS(10).reliable(), [&](const nav_msgs::msg::Odometry::SharedPtr msg) {
+            current_pos_ = make_eigen_vector3d(msg->pose.pose);
+            covariance_norm_ = std::hypot(msg->pose.covariance[XYZRPY_COV_IDX::X_X], msg->pose.covariance[XYZRPY_COV_IDX::Y_Y], msg->pose.covariance[XYZRPY_COV_IDX::YAW_YAW]);
+        });
 
         static auto umap_shot_timer = create_wall_timer(1s * period, [&]() {
             if (!image_msg_) {
@@ -101,9 +110,13 @@ public:
                 return;
             }
 
-            auto umap_result = umap_image_sender.send_from_mat(canny_img, umap::UmapImageSender::pose_t(take_picture_pos.x(), take_picture_pos.y(), 0, 0, 0, take_picture_pos.z()), umap_matching_distance, umap_matching_angle_distance);
+            double matching_distance = umap_matching_distance * (1.0 + umap_matching_distance_covariance_gain * covariance_norm_);
+            double matching_angle_distance = umap_matching_angle_distance * (1.0 + umap_matching_distance_covariance_gain * covariance_norm_);
+
+            auto umap_result = umap_image_sender.send_from_mat(canny_img, umap::UmapImageSender::pose_t(take_picture_pos.x(), take_picture_pos.y(), 0, 0, 0, take_picture_pos.z()), matching_distance, matching_angle_distance);
             if (umap_result) {
                 auto umap_pos = Eigen::Vector3d(umap_result->pose.x, umap_result->pose.y, umap_result->pose.yaw);
+                double covariance_gain = 1.0 + umap_matching_distance_covariance_gain * covariance_norm_;
 
                 geometry_msgs::msg::PoseWithCovarianceStamped umap_pos_msg;
                 umap_pos_msg.header.frame_id = "map";
@@ -114,20 +127,17 @@ public:
                     umap_pos.z() -= offset_pos.z();
                     umap_pos.head<2>() -= rotate_2d(offset_pos.head<2>(), umap_pos.z());
                     umap_pos_msg.header.stamp = now;
-                    umap_pos_msg.pose.pose = make_pose(umap_pos);
-                    umap_pos_msg.pose.covariance[XYZRPY_COV_IDX::X_X] = get_parameter("umap_pos_x_stddev").as_double() * 2;
-                    umap_pos_msg.pose.covariance[XYZRPY_COV_IDX::Y_Y] = get_parameter("umap_pos_y_stddev").as_double() * 2;
-                    umap_pos_msg.pose.covariance[XYZRPY_COV_IDX::YAW_YAW] = get_parameter("umap_pos_yaw_stddev").as_double() * 2;
+                    covariance_gain *= 2;
                 }
                 else {
                     umap_pos.z() -= offset_pos.z();
                     umap_pos.head<2>() -= rotate_2d(offset_pos.head<2>(), umap_pos.z());
                     umap_pos_msg.header.stamp = take_picture_time;
-                    umap_pos_msg.pose.pose = make_pose(umap_pos);
-                    umap_pos_msg.pose.covariance[XYZRPY_COV_IDX::X_X] = get_parameter("umap_pos_x_stddev").as_double();
-                    umap_pos_msg.pose.covariance[XYZRPY_COV_IDX::Y_Y] = get_parameter("umap_pos_y_stddev").as_double();
-                    umap_pos_msg.pose.covariance[XYZRPY_COV_IDX::YAW_YAW] = get_parameter("umap_pos_yaw_stddev").as_double();
                 }
+                umap_pos_msg.pose.pose = make_pose(umap_pos);
+                umap_pos_msg.pose.covariance[XYZRPY_COV_IDX::X_X] = get_parameter("umap_pos_x_stddev").as_double() * covariance_gain;
+                umap_pos_msg.pose.covariance[XYZRPY_COV_IDX::Y_Y] = get_parameter("umap_pos_y_stddev").as_double() * covariance_gain;
+                umap_pos_msg.pose.covariance[XYZRPY_COV_IDX::YAW_YAW] = get_parameter("umap_pos_yaw_stddev").as_double() * covariance_gain;
 
                 umap_pos_pub->publish(umap_pos_msg);
             }

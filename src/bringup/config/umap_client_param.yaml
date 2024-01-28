@@ -4,17 +4,19 @@ umap_client_node:
     offset_pos_x: 0.15
     offset_pos_y: -0.1
     offset_pos_z: 0.0
-    server_ip: 133.15.98.24
+    server_ip: 192.168.11.8
     server_port: 50000
     device_id: TB01
     camera_number: 1
+    dead_time_ms: 800
     resize_width: 320
     resize_height: 240
     canny_threshould1: 50.0
     canny_threshould2: 110.0
-    umap_request_minimum_pixel_rate: 0.015
-    umap_matching_distance: 3.0
-    umap_matching_angle_distance: 1.0
+    umap_request_minimum_pixel_rate: 0.025
+    umap_matching_distance_covariance_gain: 0.0
+    umap_matching_distance: 1.0
+    umap_matching_angle_distance: 0.3
     umap_pos_x_stddev: 0.2
     umap_pos_y_stddev: 0.2
     umap_yaw_stddev: 0.2

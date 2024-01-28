@@ -38,12 +38,13 @@ public:
     bool is_line_detected = true;
     LineDetectionType line_detection_type = LineDetectionType::CANNY;
 
+    int dead_time_ms = 1000;
+
 private:
     std::string address_ = "";
     int port_ = 0;
     std::string device_id_ = "";
     int camera_number_ = 0;
-    asio::io_context io_context_;
 
     std::string make_file_name() const
     {
@@ -109,57 +110,12 @@ private:
         file_name << ".png";
         return file_name.str();
     }
-    bool send_binary(asio::ip::tcp::socket& socket, const std::vector<uint8_t>& binary)
-    {
-        using asio::ip::tcp;
-        try {
-            socket.connect(tcp::endpoint(asio::ip::address_v4::from_string(address_), port_));
-            io_context_.run();
-            asio::write(socket, asio::buffer(binary, binary.size()));
-            return true;
-        }
-        catch (const std::exception& e) {
-            std::cout << e.what() << std::endl;
-            socket.close();
-            return false;
-        }
-    }
-    std::optional<result_t> receive(asio::ip::tcp::socket& socket)
-    {
-        using asio::ip::tcp;
-        asio::streambuf receive_buffer;
-        std::error_code error;
-
-        result_t result;
-        asio::read(socket, receive_buffer, asio::transfer_all(), error);
-        if (error && error != asio::error::eof) {
-            std::cout << "receive failed : " << error.message() << std::endl;
-            socket.close();
-            return std::nullopt;
-        }
-        else {
-            std::array<float, 9> float_array;
-            std::memcpy(float_array.data(), asio::buffer_cast<const uint8_t*>(receive_buffer.data()), sizeof(float) * 9);
-            result.pose.x = float_array[0];
-            result.pose.y = float_array[1];
-            result.pose.z = float_array[2];
-            result.pose.roll = float_array[3];
-            result.pose.pitch = float_array[4];
-            result.pose.yaw = float_array[5];
-            result.similar = float_array[6];
-            result.similar_average = float_array[7];
-            result.similar_variance = float_array[8];
-            receive_buffer.consume(receive_buffer.size());
-
-            socket.close();
-            return result;
-        }
-    }
 
 public:
     UmapImageSender(const std::string& address, int port, const std::string& device_id, int camera_number) : address_(address), port_(port), device_id_(device_id), camera_number_(camera_number) {}
     std::optional<result_t> send_from_mat(const cv::Mat& img, const pose_t& pose, float matching_distance, float matching_angle_distance)
     {
+        using namespace std::chrono_literals;
         auto file_name = make_file_name();
         std::vector<uint8_t> file_name_binary(file_name.begin(), file_name.end());
         std::vector<uint8_t> img_binary;
@@ -175,17 +131,73 @@ public:
         std::vector<uint8_t> data_size_binary(sizeof(uint32_t));
         std::memcpy(data_size_binary.data(), &data_size, sizeof(uint32_t));
         binary.insert(binary.begin(), data_size_binary.begin(), data_size_binary.end());
-        asio::ip::tcp::socket socket(io_context_);
-        if (!send_binary(socket, binary)) {
-            return std::nullopt;
-        }
-        if (is_return) {
-            return receive(socket);
-        }
-        else {
+
+        asio::io_context io_context;
+        asio::ip::tcp::socket socket(io_context);
+
+        asio::system_timer timer(io_context);
+        timer.expires_from_now(std::chrono::milliseconds(dead_time_ms));
+        timer.async_wait([&](const std::error_code& ec) {
+            if (!ec) {
+                std::cout << "receive timeout" << std::endl;
+                if (socket.is_open()) {
+                    socket.close();
+                }
+            }
+        });
+
+        std::optional<result_t> result = std::nullopt;
+        asio::streambuf receive_buffer;
+
+        socket.async_connect(asio::ip::tcp::endpoint(asio::ip::address_v4::from_string(address_), port_), [&](const std::error_code& ec) {
+            if (ec) {
+                std::cout << "connect failed : " << ec.message() << std::endl;
+                timer.cancel();
+            }
+            else {
+                asio::async_write(socket, asio::buffer(binary, binary.size()), [&](const std::error_code& ec, size_t bytes_transferred) {
+                    if (ec) {
+                        std::cout << "send failed: " << ec.message() << std::endl;
+                        timer.cancel();
+                    }
+                    else {
+                        if (is_return) {
+                            asio::async_read(socket, receive_buffer, asio::transfer_all(), [&](const std::error_code& ec, size_t length) {
+                                if (ec && ec != asio::error::eof) {
+                                    std::cout << "receive failed : " << ec.message() << std::endl;
+                                    timer.cancel();
+                                }
+                                else {
+                                    timer.cancel();
+                                    result = result_t();
+                                    std::array<float, 9> float_array;
+                                    std::memcpy(float_array.data(), asio::buffer_cast<const uint8_t*>(receive_buffer.data()), sizeof(float) * 9);
+                                    result->pose.x = float_array[0];
+                                    result->pose.y = float_array[1];
+                                    result->pose.z = float_array[2];
+                                    result->pose.roll = float_array[3];
+                                    result->pose.pitch = float_array[4];
+                                    result->pose.yaw = float_array[5];
+                                    result->similar = float_array[6];
+                                    result->similar_average = float_array[7];
+                                    result->similar_variance = float_array[8];
+                                    receive_buffer.consume(receive_buffer.size());
+                                }
+                            });
+                        }
+                        else {
+                            timer.cancel();
+                        }
+                    }
+                });
+            }
+        });
+
+        io_context.run();
+        if (socket.is_open()) {
             socket.close();
-            return std::nullopt;
         }
+        return result;
     }
 };
 
