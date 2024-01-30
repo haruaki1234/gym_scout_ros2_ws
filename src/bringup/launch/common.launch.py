@@ -53,6 +53,12 @@ def generate_launch_description():
         ),
 
         Node(
+            package='controller',
+            executable='controller',
+            output='screen'
+        ),
+
+        Node(
             package='robot_state_publisher',
             executable='robot_state_publisher',
             output='screen',

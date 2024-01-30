@@ -13,6 +13,7 @@ route_following_node:
     simulation_step: 10
     collision_map_distance: 0.5
     ignore_map_distance: 1.0
+    umap_timeout_stop_time: 2.0
     score_local_target_distance_waight: 1.0
     score_local_target_angle_waight: 0.5
     score_map_distance_waight: 0.3

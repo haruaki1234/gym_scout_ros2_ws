@@ -3,6 +3,7 @@
 #include <functional>
 
 #include <rclcpp/rclcpp.hpp>
+#include <std_msgs/msg/string.hpp>
 #include <nav_msgs/msg/path.hpp>
 #include <nav_msgs/msg/grid_cells.hpp>
 #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
@@ -82,7 +83,8 @@ private:
 
     Eigen::Vector3d current_vel_;
     Eigen::Vector3d current_pos_;
-    double covariance_norm_;
+    double covariance_norm_ = 0;
+    double umap_timeout_time_ = 0;
 
     std::vector<geometry_msgs::msg::PoseStamped> global_path_;
     Eigen::Vector3d local_target_pos_;
@@ -103,6 +105,7 @@ private:
     int simulation_step_;
     double collision_map_distance_;
     double ignore_map_distance_;
+    double umap_timeout_stop_time_;
 
     double score_local_target_distance_waight_;
     double score_local_target_angle_waight_;
@@ -149,6 +152,8 @@ public:
         collision_map_distance_ = get_parameter("collision_map_distance").as_double();
         declare_parameter<double>("ignore_map_distance", 1.0);
         ignore_map_distance_ = get_parameter("ignore_map_distance").as_double();
+        declare_parameter<double>("umap_timeout_stop_time", 1.0);
+        umap_timeout_stop_time_ = get_parameter("umap_timeout_stop_time").as_double();
 
         declare_parameter<double>("score_local_target_distance_waight", 1.0);
         score_local_target_distance_waight_ = get_parameter("score_local_target_distance_waight").as_double();
@@ -178,6 +183,7 @@ public:
         static auto candidate_path_pub = create_publisher<nav_msgs::msg::Path>("local_path_candidate", rclcpp::QoS(10).reliable());
         static auto local_path_pub = create_publisher<nav_msgs::msg::Path>("local_path", rclcpp::QoS(10).reliable());
         static auto local_target_pos_pub = create_publisher<geometry_msgs::msg::PoseStamped>("local_target_pos", rclcpp::QoS(10).reliable());
+        static auto route_follow_state_pub = create_publisher<std_msgs::msg::String>("route_follow_state", rclcpp::QoS(10).reliable());
 
         static auto localization_sub = create_subscription<nav_msgs::msg::Odometry>("ekf_odom", rclcpp::QoS(10).reliable(), [&](const nav_msgs::msg::Odometry::SharedPtr msg) {
             current_pos_ = make_eigen_vector3d(msg->pose.pose);
@@ -203,6 +209,8 @@ public:
             }
         });
 
+        static auto umap_timeout_sub = create_subscription<std_msgs::msg::Header>("umap_timeout", rclcpp::QoS(10).reliable(), [&](const std_msgs::msg::Header::SharedPtr msg) { umap_timeout_time_ = rclcpp::Time(msg->stamp).seconds(); });
+
         static auto path_publish = [&](const std::vector<Eigen::Vector3d>& path, const rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr& pub) {
             nav_msgs::msg::Path path_msg;
             path_msg.header.frame_id = "map";
@@ -217,12 +225,15 @@ public:
         };
 
         static auto timer = create_wall_timer(1s * control_period_, [&]() {
+            std_msgs::msg::String state_msg;
             if (global_path_.empty()) {
                 geometry_msgs::msg::Twist vel_msg;
                 vel_msg.linear.x = 0;
                 vel_msg.linear.y = 0;
                 vel_msg.angular.z = 0;
                 velocity_pub->publish(vel_msg);
+                state_msg.data = "wait_global_path";
+                route_follow_state_pub->publish(state_msg);
                 return;
             }
 
@@ -264,6 +275,8 @@ public:
                 vel_msg.linear.y = 0;
                 vel_msg.angular.z = 0;
                 velocity_pub->publish(vel_msg);
+                state_msg.data = "goal";
+                route_follow_state_pub->publish(state_msg);
                 return;
             }
             else if ((goal_pos - current_pos_).head<2>().norm() < near_goal_control_distance_) {
@@ -276,6 +289,8 @@ public:
                 geometry_msgs::msg::Twist vel_msg;
                 vel_msg = make_twist(target_vel);
                 velocity_pub->publish(vel_msg);
+                state_msg.data = "near_goal_control";
+                route_follow_state_pub->publish(state_msg);
                 return;
             }
 
@@ -300,6 +315,8 @@ public:
             if ((this->get_clock()->now() - start_time).seconds() > control_period_) {
                 RCLCPP_WARN(this->get_logger(), "calc time: %f", (this->get_clock()->now() - start_time).seconds());
             }
+            state_msg.data = "dwa_control";
+            route_follow_state_pub->publish(state_msg);
         });
     }
 
@@ -318,11 +335,14 @@ private:
         }
         return pos_vec;
     }
-    std::vector<local_path_data_t> make_choices_path() const
+    std::vector<local_path_data_t> make_choices_path()
     {
         double max_vel = std::max(max_vel_ / (1 + covariance_gain_ * covariance_norm_), minimum_max_vel_);
-        std::cout << max_vel << std::endl;
         double max_angle_vel = std::max(max_angle_vel_ / (1 + covariance_gain_ * covariance_norm_), minimum_max_angle_vel_);
+        if ((this->get_clock()->now().seconds() - umap_timeout_time_) < umap_timeout_stop_time_) {
+            max_vel = 0;
+            max_angle_vel = 0;
+        }
         auto rotate_vel = rotate_2d(current_vel_.head<2>(), -current_pos_.z());
         std::vector<local_path_data_t> choices_path;
         int half_vel_split_num = vel_split_num_ / 2;
@@ -334,10 +354,12 @@ private:
                     double z = current_vel_.z() + max_angle_acc_ * control_period_ / half_vel_split_num * k;
                     if ((std::hypot(x, y) <= max_vel && std::abs(z) <= max_angle_vel) || (std::hypot(x, y) < rotate_vel.norm() && std::abs(z) < std::abs(current_vel_.z()))) {
                         choices_path.push_back(local_path_data_t(Eigen::Vector3d(x, y, z), simulation_pos(Eigen::Vector3d(x, y, z), current_pos_)));
-                        std::cout << x << ", " << y << ", " << z << std::endl;
                     }
                 }
             }
+        }
+        if (choices_path.empty()) {
+            choices_path.push_back(local_path_data_t(Eigen::Vector3d(0, 0, 0), simulation_pos(Eigen::Vector3d(0, 0, 0), current_pos_)));
         }
         return choices_path;
     }

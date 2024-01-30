@@ -139,7 +139,7 @@ public:
         timer.expires_from_now(std::chrono::milliseconds(dead_time_ms));
         timer.async_wait([&](const std::error_code& ec) {
             if (!ec) {
-                std::cout << "receive timeout" << std::endl;
+                std::cout << "timeout" << std::endl;
                 if (socket.is_open()) {
                     socket.close();
                 }
@@ -151,20 +151,26 @@ public:
 
         socket.async_connect(asio::ip::tcp::endpoint(asio::ip::address_v4::from_string(address_), port_), [&](const std::error_code& ec) {
             if (ec) {
-                std::cout << "connect failed : " << ec.message() << std::endl;
+                if (ec != asio::error::operation_aborted) {
+                    std::cout << "connect failed : " << ec.message() << std::endl;
+                }
                 timer.cancel();
             }
             else {
                 asio::async_write(socket, asio::buffer(binary, binary.size()), [&](const std::error_code& ec, size_t bytes_transferred) {
                     if (ec) {
-                        std::cout << "send failed: " << ec.message() << std::endl;
+                        if (ec != asio::error::operation_aborted) {
+                            std::cout << "send failed: " << ec.message() << std::endl;
+                        }
                         timer.cancel();
                     }
                     else {
                         if (is_return) {
                             asio::async_read(socket, receive_buffer, asio::transfer_all(), [&](const std::error_code& ec, size_t length) {
                                 if (ec && ec != asio::error::eof) {
-                                    std::cout << "receive failed : " << ec.message() << std::endl;
+                                    if (ec != asio::error::operation_aborted) {
+                                        std::cout << "receive failed : " << ec.message() << std::endl;
+                                    }
                                     timer.cancel();
                                 }
                                 else {

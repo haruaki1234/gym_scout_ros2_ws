@@ -38,12 +38,12 @@ Vector6d predictNextState(const Vector6d& X_curr, const double dt)
 
 /*  == Linearized model ==
  *
- * A = [ 1, 0, (-vx*sin(yaw)-vy*cos(yaw))*dt, cos(yaw)*dt, -sin(yaw),   0]
- *     [ 0, 1,  (vx*cos(yaw)-vy*sin(yaw))*dt, sin(yaw)*dt,  cos(yaw),   0]
- *     [ 0, 0,                             1,           0,         0,  dt]
- *     [ 0, 0,                             0,           1,         0,   0]
- *     [ 0, 0,                             0,           0,         1,   0]
- *     [ 0, 0,                             0,           0,         0,   1]
+ * A = [ 1, 0, (-vx*sin(yaw)-vy*cos(yaw))*dt, cos(yaw)*dt, -sin(yaw)*dt,   0]
+ *     [ 0, 1,  (vx*cos(yaw)-vy*sin(yaw))*dt, sin(yaw)*dt,  cos(yaw)*dt,   0]
+ *     [ 0, 0,                             1,           0,            0,  dt]
+ *     [ 0, 0,                             0,           1,            0,   0]
+ *     [ 0, 0,                             0,           0,            1,   0]
+ *     [ 0, 0,                             0,           0,            0,   1]
  */
 Matrix6d createStateTransitionMatrix(const Vector6d& X_curr, const double dt)
 {

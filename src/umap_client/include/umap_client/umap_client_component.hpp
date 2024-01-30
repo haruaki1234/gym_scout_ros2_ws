@@ -1,6 +1,7 @@
 #pragma once
 
 #include <rclcpp/rclcpp.hpp>
+#include <std_msgs/msg/header.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <cv_bridge/cv_bridge.h>
@@ -75,6 +76,7 @@ public:
         umap_image_sender.dead_time_ms = get_parameter("dead_time_ms").as_int();
 
         static auto umap_pos_pub = create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("umap_pos", rclcpp::QoS(10).reliable());
+        static auto umap_timeout_pub = create_publisher<std_msgs::msg::Header>("umap_timeout", rclcpp::QoS(10).reliable());
 
         static auto image_sub = this->create_subscription<sensor_msgs::msg::Image>("/image", rclcpp::QoS(rclcpp::KeepLast(3)), [&](sensor_msgs::msg::Image::SharedPtr msg) {
             image_msg_ = msg;
@@ -120,7 +122,7 @@ public:
 
                 geometry_msgs::msg::PoseWithCovarianceStamped umap_pos_msg;
                 umap_pos_msg.header.frame_id = "map";
-                if (auto now = this->get_clock()->now(); (now - take_picture_time).seconds() > 1.0) {
+                if (auto now = this->get_clock()->now(); (now - take_picture_time).seconds() > period) {
                     auto localization_diff = current_pos_ - take_picture_pos;
                     umap_pos.head<2>() += rotate_2d(localization_diff.head<2>(), umap_pos.z() - take_picture_pos.z());
                     umap_pos.z() += localization_diff.z();
@@ -140,6 +142,11 @@ public:
                 umap_pos_msg.pose.covariance[XYZRPY_COV_IDX::YAW_YAW] = get_parameter("umap_pos_yaw_stddev").as_double() * covariance_gain;
 
                 umap_pos_pub->publish(umap_pos_msg);
+            }
+            else {
+                std_msgs::msg::Header umap_timeout_msg;
+                umap_timeout_msg.stamp = this->get_clock()->now();
+                umap_timeout_pub->publish(umap_timeout_msg);
             }
         });
     }
