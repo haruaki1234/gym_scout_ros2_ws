@@ -1,0 +1,7 @@
+velocity_control_node:
+  ros__parameters:
+    dt: 0.01
+    xy_kp: 0.5
+    xy_ki: 0.1
+    yaw_kp: 0.5
+    yaw_ki: 0.1

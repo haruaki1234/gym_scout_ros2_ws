@@ -59,6 +59,15 @@ def generate_launch_description():
         ),
 
         Node(
+            package='velocity_control',
+            executable='velocity_control',
+            output='screen',
+            parameters=[
+                os.path.join(pkg_dir, "config", "velocity_control_param.yaml")
+            ]
+        ),
+
+        Node(
             package='robot_state_publisher',
             executable='robot_state_publisher',
             output='screen',

@@ -29,7 +29,7 @@ public:
         using namespace std::chrono_literals;
 
         static std::vector<Eigen::Vector3d> waypoints = {
-            Eigen::Vector3d(34.0, 0.8, 0.0), Eigen::Vector3d(6.3, 0.8, 0.0),
+            Eigen::Vector3d(34.0, 1.0, 0.0), Eigen::Vector3d(6.3, 1.0, 0.0),
             // Eigen::Vector3d(2.6, 40.0, 0.0),
         };
 

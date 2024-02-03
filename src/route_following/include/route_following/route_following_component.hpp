@@ -91,6 +91,7 @@ private:
     std::optional<kd_tree::EigenVectorTree<2>> map_grid_;
 
     int near_index_ = 0;
+    bool is_start_angle_control_ = true;
 
     double control_period_;
     double covariance_gain_;
@@ -179,7 +180,7 @@ public:
         scores_.push_back(Score(score_map_distance_waight_, [&](const local_path_data_t& path) { return calc_score_map_distance(path); }));
         scores_.push_back(Score(score_integral_error_waight_, [&](const local_path_data_t& path) { return calc_score_integral_error(path); }));
 
-        static auto velocity_pub = create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 5);
+        static auto velocity_pub = create_publisher<geometry_msgs::msg::Twist>("target_vel", 5);
         static auto candidate_path_pub = create_publisher<nav_msgs::msg::Path>("local_path_candidate", rclcpp::QoS(10).reliable());
         static auto local_path_pub = create_publisher<nav_msgs::msg::Path>("local_path", rclcpp::QoS(10).reliable());
         static auto local_target_pos_pub = create_publisher<geometry_msgs::msg::PoseStamped>("local_target_pos", rclcpp::QoS(10).reliable());
@@ -194,6 +195,7 @@ public:
         static auto global_path_sub = create_subscription<nav_msgs::msg::Path>("global_path", rclcpp::QoS(10).reliable(), [&](const nav_msgs::msg::Path::SharedPtr msg) {
             global_path_ = msg->poses;
             near_index_ = 0;
+            is_start_angle_control_ = true;
         });
         static auto map_grid_sub = create_subscription<nav_msgs::msg::GridCells>("map_grid", rclcpp::QoS(10).reliable(), [&](const nav_msgs::msg::GridCells::SharedPtr msg) {
             static auto stamp = this->get_clock()->now();
@@ -237,6 +239,49 @@ public:
                 return;
             }
 
+            if (is_start_angle_control_) {
+                auto e = make_eigen_vector3d(global_path_.front().pose) - current_pos_;
+                auto target_vel = Eigen::Vector3d(0, 0, e.z() * near_goal_control_angle_kp_);
+                target_vel.z() = std::clamp(target_vel.z(), -max_angle_vel_, max_angle_vel_);
+                geometry_msgs::msg::Twist vel_msg;
+                vel_msg = make_twist(target_vel);
+                velocity_pub->publish(vel_msg);
+                state_msg.data = "start_angle_control";
+                route_follow_state_pub->publish(state_msg);
+                if (std::abs(e.z()) < 0.1) {
+                    is_start_angle_control_ = false;
+                }
+                return;
+            }
+
+            if (auto goal_pos = make_eigen_vector3d(global_path_.back().pose); (goal_pos - current_pos_).head<2>().norm() < goal_distance_) {
+                global_path_.clear();
+                geometry_msgs::msg::Twist vel_msg;
+                vel_msg.linear.x = 0;
+                vel_msg.linear.y = 0;
+                vel_msg.angular.z = 0;
+                velocity_pub->publish(vel_msg);
+                state_msg.data = "goal";
+                route_follow_state_pub->publish(state_msg);
+                return;
+            }
+            else if ((goal_pos - current_pos_).head<2>().norm() < near_goal_control_distance_) {
+                auto e = goal_pos - current_pos_;
+                auto target_vel = Eigen::Vector3d(e.x() * near_goal_control_pos_kp_, e.y() * near_goal_control_pos_kp_, e.z() * near_goal_control_angle_kp_);
+                target_vel.head<2>() = rotate_2d(target_vel.head<2>(), -current_pos_.z());
+                target_vel.x() = std::clamp(target_vel.x(), -max_vel_, max_vel_);
+                target_vel.y() = std::clamp(target_vel.y(), -max_vel_, max_vel_);
+                target_vel.z() = std::clamp(target_vel.z(), -max_angle_vel_, max_angle_vel_);
+                geometry_msgs::msg::Twist vel_msg;
+                vel_msg = make_twist(target_vel);
+                velocity_pub->publish(vel_msg);
+                state_msg.data = "near_goal_control";
+                route_follow_state_pub->publish(state_msg);
+                return;
+            }
+
+            auto start_time = this->get_clock()->now();
+
             {
                 double min_e = std::numeric_limits<double>::infinity();
                 for (size_t i = near_index_; i < global_path_.size(); i++) {
@@ -267,34 +312,6 @@ public:
                 local_target_pos_msg.pose = make_pose(local_target_pos_);
                 local_target_pos_pub->publish(local_target_pos_msg);
             }
-
-            if (auto goal_pos = make_eigen_vector3d(global_path_.back().pose); (goal_pos - current_pos_).head<2>().norm() < goal_distance_) {
-                global_path_.clear();
-                geometry_msgs::msg::Twist vel_msg;
-                vel_msg.linear.x = 0;
-                vel_msg.linear.y = 0;
-                vel_msg.angular.z = 0;
-                velocity_pub->publish(vel_msg);
-                state_msg.data = "goal";
-                route_follow_state_pub->publish(state_msg);
-                return;
-            }
-            else if ((goal_pos - current_pos_).head<2>().norm() < near_goal_control_distance_) {
-                auto e = goal_pos - current_pos_;
-                auto target_vel = Eigen::Vector3d(e.x() * near_goal_control_pos_kp_, e.y() * near_goal_control_pos_kp_, e.z() * near_goal_control_angle_kp_);
-                target_vel.head<2>() = rotate_2d(target_vel.head<2>(), -current_pos_.z());
-                target_vel.x() = std::clamp(target_vel.x(), -max_vel_, max_vel_);
-                target_vel.y() = std::clamp(target_vel.y(), -max_vel_, max_vel_);
-                target_vel.z() = std::clamp(target_vel.z(), -max_angle_vel_, max_angle_vel_);
-                geometry_msgs::msg::Twist vel_msg;
-                vel_msg = make_twist(target_vel);
-                velocity_pub->publish(vel_msg);
-                state_msg.data = "near_goal_control";
-                route_follow_state_pub->publish(state_msg);
-                return;
-            }
-
-            auto start_time = this->get_clock()->now();
 
             auto choices_path = make_choices_path();
             for (auto& p : choices_path) {
