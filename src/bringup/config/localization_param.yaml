@@ -1,7 +1,7 @@
 localization_node:
   ros__parameters:
-    # start_pos: [2.8 , 57.0 , -1.57]
-    start_pos: [6.3, 1.0, 0.0]
+    # start_pos: [2.6 , 42.0 , -1.57]
+    start_pos: [6.3, 1.2, 0.0]
     show_debug_info: false
     predict_frequency: 10.0
     tf_rate: 10.0

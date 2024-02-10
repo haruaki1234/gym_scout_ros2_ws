@@ -20,7 +20,8 @@ class UmapClient : public rclcpp::Node {
 private:
     sensor_msgs::msg::Image::SharedPtr image_msg_;
     Eigen::Vector3d current_pos_;
-    double covariance_norm_;
+    double xy_covariance_norm_;
+    double theta_covariance_norm_;
 
     Eigen::Vector3d take_picture_pos_;
     rclcpp::Time take_picture_time_;
@@ -78,14 +79,15 @@ public:
         static auto umap_pos_pub = create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("umap_pos", rclcpp::QoS(10).reliable());
         static auto umap_timeout_pub = create_publisher<std_msgs::msg::Header>("umap_timeout", rclcpp::QoS(10).reliable());
 
-        static auto image_sub = this->create_subscription<sensor_msgs::msg::Image>("/image", rclcpp::QoS(rclcpp::KeepLast(3)), [&](sensor_msgs::msg::Image::SharedPtr msg) {
+        static auto image_sub = this->create_subscription<sensor_msgs::msg::Image>("/image_raw", rclcpp::QoS(rclcpp::KeepLast(3)), [&](sensor_msgs::msg::Image::SharedPtr msg) {
             image_msg_ = msg;
             take_picture_pos_ = current_pos_;
             take_picture_time_ = this->get_clock()->now();
         });
         static auto localization_sub = create_subscription<nav_msgs::msg::Odometry>("ekf_odom", rclcpp::QoS(10).reliable(), [&](const nav_msgs::msg::Odometry::SharedPtr msg) {
             current_pos_ = make_eigen_vector3d(msg->pose.pose);
-            covariance_norm_ = std::hypot(msg->pose.covariance[XYZRPY_COV_IDX::X_X], msg->pose.covariance[XYZRPY_COV_IDX::Y_Y], msg->pose.covariance[XYZRPY_COV_IDX::YAW_YAW]);
+            xy_covariance_norm_ = std::hypot(msg->pose.covariance[XYZRPY_COV_IDX::X_X], msg->pose.covariance[XYZRPY_COV_IDX::Y_Y]);
+            theta_covariance_norm_ = msg->pose.covariance[XYZRPY_COV_IDX::YAW_YAW];
         });
 
         static auto umap_shot_timer = create_wall_timer(1s * period, [&]() {
@@ -112,13 +114,13 @@ public:
                 return;
             }
 
-            double matching_distance = umap_matching_distance * (1.0 + umap_matching_distance_covariance_gain * covariance_norm_);
-            double matching_angle_distance = umap_matching_angle_distance * (1.0 + umap_matching_distance_covariance_gain * covariance_norm_);
+            double matching_distance = umap_matching_distance + umap_matching_distance_covariance_gain * std::sqrt(xy_covariance_norm_);
+            double matching_angle_distance = umap_matching_angle_distance + umap_matching_distance_covariance_gain * std::sqrt(theta_covariance_norm_);
 
             auto umap_result = umap_image_sender.send_from_mat(canny_img, umap::UmapImageSender::pose_t(take_picture_pos.x(), take_picture_pos.y(), 0, 0, 0, take_picture_pos.z()), matching_distance, matching_angle_distance);
             if (umap_result) {
                 auto umap_pos = Eigen::Vector3d(umap_result->pose.x, umap_result->pose.y, umap_result->pose.yaw);
-                double covariance_gain = 1.0 + umap_matching_distance_covariance_gain * covariance_norm_;
+                double covariance_gain = 1.0 + umap_matching_distance_covariance_gain * std::hypot(xy_covariance_norm_, theta_covariance_norm_);
 
                 geometry_msgs::msg::PoseWithCovarianceStamped umap_pos_msg;
                 umap_pos_msg.header.frame_id = "map";

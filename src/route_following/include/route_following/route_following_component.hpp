@@ -240,7 +240,8 @@ public:
             }
 
             if (is_start_angle_control_) {
-                auto e = make_eigen_vector3d(global_path_.front().pose) - current_pos_;
+                Eigen::Vector3d e = make_eigen_vector3d(global_path_.front().pose) - current_pos_;
+                e.z() = normalize_angle(e.z());
                 auto target_vel = Eigen::Vector3d(0, 0, e.z() * near_goal_control_angle_kp_);
                 target_vel.z() = std::clamp(target_vel.z(), -max_angle_vel_, max_angle_vel_);
                 geometry_msgs::msg::Twist vel_msg;

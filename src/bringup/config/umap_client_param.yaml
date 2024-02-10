@@ -14,9 +14,9 @@ umap_client_node:
     canny_threshould1: 50.0
     canny_threshould2: 110.0
     umap_request_minimum_pixel_rate: 0.025
-    umap_matching_distance_covariance_gain: 3.0
-    umap_matching_distance: 1.0
-    umap_matching_angle_distance: 0.3
+    umap_matching_distance_covariance_gain: 1.0
+    umap_matching_distance: 0.3
+    umap_matching_angle_distance: 0.15
     umap_pos_x_stddev: 0.2
     umap_pos_y_stddev: 0.2
     umap_yaw_stddev: 0.2
