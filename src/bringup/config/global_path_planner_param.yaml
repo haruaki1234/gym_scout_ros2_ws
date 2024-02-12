@@ -7,4 +7,4 @@ global_path_planner_node:
     max_y: 65.41468
     diagonal_movement: true
     wall_search_range: 1
-    wall_cost_waight: 1.0
+    wall_cost_waight: 2.0

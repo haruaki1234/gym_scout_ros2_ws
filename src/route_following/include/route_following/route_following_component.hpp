@@ -101,6 +101,8 @@ private:
     double max_angle_vel_;
     double minimum_max_angle_vel_;
     double max_angle_acc_;
+    int serch_curve_index_num_;
+    double curve_vel_rate_;
     int vel_split_num_;
     double simulation_time_;
     int simulation_step_;
@@ -118,6 +120,9 @@ private:
     double near_goal_control_angle_kp_;
 
     double goal_distance_;
+
+    double current_max_vel_;
+    double current_max_angle_vel_;
 
     std::vector<Score> scores_;
 
@@ -143,6 +148,10 @@ public:
         minimum_max_angle_vel_ = get_parameter("minimum_max_angle_vel").as_double();
         declare_parameter<double>("max_angle_acc", 1.0);
         max_angle_acc_ = get_parameter("max_angle_acc").as_double();
+        declare_parameter<int>("serch_curve_index_num", 1);
+        serch_curve_index_num_ = get_parameter("serch_curve_index_num").as_int();
+        declare_parameter<double>("curve_vel_rate", 1.0);
+        curve_vel_rate_ = get_parameter("curve_vel_rate").as_double();
         declare_parameter<int>("vel_split_num", 10);
         vel_split_num_ = get_parameter("vel_split_num").as_int();
         declare_parameter<double>("simulation_time", 1.0);
@@ -293,7 +302,24 @@ public:
                         near_index_ = i;
                     }
                 }
-                double max_vel = std::max(max_vel_ / (1 + covariance_gain_ * covariance_norm_), minimum_max_vel_);
+
+                current_max_vel_ = max_vel_ / (1 + covariance_gain_ * covariance_norm_);
+                geometry_msgs::msg::PoseStamped before_pose = global_path_[std::max(near_index_ - serch_curve_index_num_, 0)];
+                for (int i = -serch_curve_index_num_; i < serch_curve_index_num_; i++) {
+                    auto pose = global_path_[std::clamp(near_index_ + i, 0, static_cast<int>(global_path_.size()) - 1)];
+                    if (pose.pose.position.x != before_pose.pose.position.x && pose.pose.position.y != before_pose.pose.position.y) {
+                        current_max_vel_ *= curve_vel_rate_;
+                        break;
+                    }
+                    before_pose = pose;
+                }
+                current_max_vel_ = std::max(current_max_vel_, minimum_max_vel_);
+                current_max_angle_vel_ = std::max(max_angle_vel_ / (1 + covariance_gain_ * covariance_norm_), minimum_max_angle_vel_);
+                if ((this->get_clock()->now().seconds() - umap_timeout_time_) < umap_timeout_stop_time_) {
+                    current_max_vel_ = 0;
+                    current_max_vel_ = 0;
+                }
+
                 int target_index = near_index_;
                 double route_distance = 0;
                 auto prev_pos = Eigen::Vector2d(global_path_[near_index_].pose.position.x, global_path_[near_index_].pose.position.y);
@@ -302,7 +328,7 @@ public:
                     route_distance += (pos - prev_pos).norm();
                     prev_pos = pos;
                     target_index = i;
-                    if (route_distance >= max_vel * simulation_time_) {
+                    if (route_distance >= current_max_vel_ * simulation_time_) {
                         break;
                     }
                 }
@@ -355,12 +381,6 @@ private:
     }
     std::vector<local_path_data_t> make_choices_path()
     {
-        double max_vel = std::max(max_vel_ / (1 + covariance_gain_ * covariance_norm_), minimum_max_vel_);
-        double max_angle_vel = std::max(max_angle_vel_ / (1 + covariance_gain_ * covariance_norm_), minimum_max_angle_vel_);
-        if ((this->get_clock()->now().seconds() - umap_timeout_time_) < umap_timeout_stop_time_) {
-            max_vel = 0;
-            max_angle_vel = 0;
-        }
         auto rotate_vel = rotate_2d(current_vel_.head<2>(), -current_pos_.z());
         std::vector<local_path_data_t> choices_path;
         int half_vel_split_num = vel_split_num_ / 2;
@@ -370,7 +390,7 @@ private:
                 double y = rotate_vel.y() + max_acc_ * control_period_ / half_vel_split_num * j;
                 for (int k = -half_vel_split_num; k < half_vel_split_num; k++) {
                     double z = current_vel_.z() + max_angle_acc_ * control_period_ / half_vel_split_num * k;
-                    if ((std::hypot(x, y) <= max_vel && std::abs(z) <= max_angle_vel) || (std::hypot(x, y) < rotate_vel.norm() && std::abs(z) < std::abs(current_vel_.z()))) {
+                    if ((std::hypot(x, y) <= current_max_vel_ && std::abs(z) <= current_max_angle_vel_) || (std::hypot(x, y) < rotate_vel.norm() && std::abs(z) < std::abs(current_vel_.z()))) {
                         choices_path.push_back(local_path_data_t(Eigen::Vector3d(x, y, z), simulation_pos(Eigen::Vector3d(x, y, z), current_pos_)));
                     }
                 }
