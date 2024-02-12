@@ -45,7 +45,7 @@ def generate_launch_description():
             package='v4l2_camera',
             executable='v4l2_camera_node',
             output='screen',
-            parameters=[{"video_device": "/dev/video2"}]
+            parameters=[{"video_device": "/dev/video3"}]
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(

@@ -2,7 +2,7 @@ route_following_node:
   ros__parameters:
     control_period: 0.2
     covariance_gain: 2.0
-    max_vel: 1.0
+    max_vel: 0.5
     minimum_max_vel: 0.1
     max_acc: 1.0
     max_angle_vel: 1.0
