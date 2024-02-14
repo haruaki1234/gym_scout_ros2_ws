@@ -19,11 +19,11 @@ def generate_launch_description():
     pkg_dir = get_package_share_directory("bringup")
 
     list = [
-        # Node(
-        #     package='rviz2',
-        #     executable='rviz2',
-        #     arguments=['-d', os.path.join(get_package_share_directory("bringup"), "config", "slam_rviz_config.rviz")]
-        # ),
+        Node(
+            package='rviz2',
+            executable='rviz2',
+            arguments=['-d', os.path.join(get_package_share_directory("bringup"), "config", "slam_rviz_config.rviz")]
+        ),
         Node(
             package='tf2_ros',
             executable='static_transform_publisher',
@@ -41,34 +41,34 @@ def generate_launch_description():
             executable='slam_bridge',
             output='screen',
             parameters=[
-                {'start_pos': [2.6 , 42.0 , -1.642]}
+                {'start_pos': [2.6 , 42.0 , -1.62]}
+            ]
+        ),
+        Node(
+            package='slam_toolbox',
+            executable='async_slam_toolbox_node',
+            output='screen',
+            parameters=[
+                os.path.join(pkg_dir, "config", "slam_toolbox_param.yaml")
             ]
         ),
         # Node(
-        #     package='slam_toolbox',
-        #     executable='async_slam_toolbox_node',
+        #     name='emcl2',
+        #     package='emcl2',
+        #     executable='emcl2_node',
         #     output='screen',
         #     parameters=[
-        #         os.path.join(pkg_dir, "config", "slam_toolbox_param.yaml")
+        #         os.path.join(pkg_dir, "config", "emcl_param.yaml")
         #     ]
         # ),
-        Node(
-            name='emcl2',
-            package='emcl2',
-            executable='emcl2_node',
-            output='screen',
-            parameters=[
-                os.path.join(pkg_dir, "config", "emcl_param.yaml")
-            ]
-        ),
-        Node(
-            package='nav2_map_server',
-            executable='map_server',
-            output='screen',
-            parameters=[
-                os.path.join(pkg_dir, "config", "map_server_param.yaml")
-            ]
-        ),
+        # Node(
+        #     package='nav2_map_server',
+        #     executable='map_server',
+        #     output='screen',
+        #     parameters=[
+        #         os.path.join(pkg_dir, "config", "map_server_param.yaml")
+        #     ]
+        # ),
         # Node(
         #     package='als_ros',
         #     executable='mcl',
@@ -86,16 +86,16 @@ def generate_launch_description():
         #         os.path.join(pkg_dir, "config", "amcl_param.yaml")
         #     ]
         # ),
-        Node(
-            package='nav2_lifecycle_manager',
-            executable='lifecycle_manager',
-            name='lifecycle_manager_localization',
-            output='screen',
-            parameters=[
-                {'autostart': True},
-                {'node_names': ['map_server']}
-            ]
-        ),
+        # Node(
+        #     package='nav2_lifecycle_manager',
+        #     executable='lifecycle_manager',
+        #     name='lifecycle_manager_localization',
+        #     output='screen',
+        #     parameters=[
+        #         {'autostart': True},
+        #         {'node_names': ['map_server']}
+        #     ]
+        # ),
 
         launch.actions.ExecuteProcess(
             cmd=['ros2', 'bag', 'play', '../rosbag/panorama_d4f_scout_continuous_test10/log'],

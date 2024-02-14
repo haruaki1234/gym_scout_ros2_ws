@@ -16,8 +16,8 @@ slam_toolbox:
     scan_topic: slam_scan
     mode: localization #localization
 
-    map_file_name: /home/tlab5/Documents/scout_ros2_ws/d4f
-    map_start_pose: [2.6 , 42.0 , -1.57]
+    # map_file_name: /home/tlab5/Documents/scout_ros2_ws/d4f
+    # map_start_pose: [2.6 , 42.0 , -1.57]
 
     debug_logging: false
     throttle_scans: 1

@@ -10,7 +10,7 @@ route_following_node:
     max_angle_acc: 1.0
     serch_curve_index_num: 10
     curve_vel_rate: 0.5
-    vel_split_num: 10
+    vel_split_num: 6
     simulation_time: 1.0
     simulation_step: 10
     collision_map_distance: 0.5

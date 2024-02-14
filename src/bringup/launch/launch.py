@@ -45,7 +45,12 @@ def generate_launch_description():
             package='v4l2_camera',
             executable='v4l2_camera_node',
             output='screen',
-            parameters=[{"video_device": "/dev/video3"}]
+            parameters=[{"video_device": "/dev/video4"}]
+        ),
+        Node(
+            package='urg_node',
+            executable='urg_node_driver',
+            arguments=['--ros-args', '-p', 'ip_address:=192.168.0.10']
         ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(

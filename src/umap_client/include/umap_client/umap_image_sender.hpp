@@ -56,7 +56,8 @@ private:
             file_name << "F";
         }
         file_name << "R";
-        auto time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+        auto now = std::chrono::system_clock::now();
+        auto time = std::chrono::system_clock::to_time_t(now);
         auto time_info = std::localtime(&time);
         int year = time_info->tm_year + 1900;
         file_name << std::setw(2) << std::setfill('0') << std::to_string(year % ((year / 1000) * 1000));
@@ -65,7 +66,8 @@ private:
         file_name << std::setw(2) << std::setfill('0') << std::to_string(time_info->tm_hour);
         file_name << std::setw(2) << std::setfill('0') << std::to_string(time_info->tm_min);
         file_name << std::setw(2) << std::setfill('0') << std::to_string(time_info->tm_sec);
-        file_name << std::setw(4) << std::setfill('0') << device_id_;
+        file_name << std::setw(4) << std::setfill('0') << std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count() % 1000);
+        // file_name << std::setw(4) << std::setfill('0') << device_id_;
         file_name << std::setw(2) << std::setfill('0') << std::to_string(camera_number_);
         std::string process_histry = "";
         if (is_calibrated) {
