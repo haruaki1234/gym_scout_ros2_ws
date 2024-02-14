@@ -6,11 +6,11 @@ route_following_node:
     minimum_max_vel: 0.1
     max_acc: 1.0
     max_angle_vel: 1.0
-    minimum_max_angle_vel: 0.1
+    minimum_max_angle_vel: 0.3
     max_angle_acc: 1.0
-    serch_curve_index_num: 4
+    serch_curve_index_num: 10
     curve_vel_rate: 0.5
-    vel_split_num: 4
+    vel_split_num: 10
     simulation_time: 1.0
     simulation_step: 10
     collision_map_distance: 0.5

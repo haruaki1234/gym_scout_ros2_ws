@@ -305,15 +305,15 @@ public:
 
                 current_max_vel_ = max_vel_ / (1 + covariance_gain_ * covariance_norm_);
                 geometry_msgs::msg::PoseStamped before_pose = global_path_[std::max(near_index_ - serch_curve_index_num_, 0)];
-                for (int i = -serch_curve_index_num_; i < serch_curve_index_num_; i++) {
+                double rate = 1;
+                for (int i = -serch_curve_index_num_; i <= serch_curve_index_num_; i++) {
                     auto pose = global_path_[std::clamp(near_index_ + i, 0, static_cast<int>(global_path_.size()) - 1)];
                     if (pose.pose.position.x != before_pose.pose.position.x && pose.pose.position.y != before_pose.pose.position.y) {
-                        current_max_vel_ *= curve_vel_rate_;
-                        break;
+                        rate = std::min(rate, (1.0 - curve_vel_rate_) / serch_curve_index_num_ * std::abs(i) + curve_vel_rate_);
                     }
                     before_pose = pose;
                 }
-                current_max_vel_ = std::max(current_max_vel_, minimum_max_vel_);
+                current_max_vel_ = std::max(current_max_vel_ * rate, minimum_max_vel_);
                 current_max_angle_vel_ = std::max(max_angle_vel_ / (1 + covariance_gain_ * covariance_norm_), minimum_max_angle_vel_);
                 if ((this->get_clock()->now().seconds() - umap_timeout_time_) < umap_timeout_stop_time_) {
                     current_max_vel_ = 0;
