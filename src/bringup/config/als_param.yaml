@@ -1,0 +1,12 @@
+mcl:
+  ros__parameters:
+    scan_name: slam_scan
+    laser_frame: slam_laser
+    base_link_frame: slam_base_link
+    odom_frame: slam_odom
+    initial_pose_x: 2.6
+    initial_pose_y: 42.0
+    initial_pose_yaw: -1.57
+    use_odom_tf: false
+    mae_classifier_dir: /home/tlab5/Documents/scout_ros2_ws/src/als_ros/src/als_ros/classifiers/MAE/
+    transform_tolerance: 0.0
