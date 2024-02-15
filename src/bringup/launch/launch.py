@@ -45,7 +45,7 @@ def generate_launch_description():
             package='v4l2_camera',
             executable='v4l2_camera_node',
             output='screen',
-            parameters=[{"video_device": "/dev/video4"}]
+            parameters=[{"video_device": "/dev/video0", "image_size": [320, 240]}]
         ),
         Node(
             package='urg_node',

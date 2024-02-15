@@ -8,7 +8,7 @@ umap_client_node:
     server_port: 50000
     device_id: TB01
     camera_number: 1
-    dead_time_ms: 200
+    dead_time_ms: 800
     resize_width: 320
     resize_height: 240
     canny_threshould1: 50.0

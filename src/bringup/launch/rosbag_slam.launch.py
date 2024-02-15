@@ -98,7 +98,7 @@ def generate_launch_description():
         # ),
 
         launch.actions.ExecuteProcess(
-            cmd=['ros2', 'bag', 'play', '../rosbag/panorama_d4f_scout_half_0.1s/log'],
+            cmd=['ros2', 'bag', 'play', '../rosbag/panorama_d4f_scout_half_1s_2/log'],
             output='screen'
         ),
     ]
