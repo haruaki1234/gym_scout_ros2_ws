@@ -27,8 +27,16 @@ private:
     tf2_ros::Buffer tf_buffer_;
     tf2_ros::TransformListener tf_listener_;
 
+    nav_msgs::msg::Odometry last_odom_;
+
     std::ofstream pose_log_file_;
     std::optional<int64_t> first_time_ = std::nullopt;
+
+    std::ofstream umap_log_file_;
+
+    double odom_x_ = 0;
+    double odom_y_ = 0;
+    double odom_yaw_ = 0;
 
 public:
     SlamBridge(const rclcpp::NodeOptions& options) : SlamBridge("", options) {}
@@ -37,7 +45,7 @@ public:
         broadcaster_(this),                            //
         tf_buffer_(this->get_clock()),                 //
         tf_listener_(tf_buffer_),                      //
-        pose_log_file_("pose_log.csv")
+        pose_log_file_("pose_log.csv"), umap_log_file_("umap_log.csv")
     {
         using namespace std::chrono_literals;
         tf_buffer_.setUsingDedicatedThread(true);
@@ -62,16 +70,18 @@ public:
             double init_x = initial_pos[0];
             double init_y = initial_pos[1];
             double init_yaw = initial_pos[2];
+            odom_x_ = msg->pose.pose.position.x * std::cos(init_yaw) - msg->pose.pose.position.y * std::sin(init_yaw) + init_x;
+            odom_y_ = msg->pose.pose.position.x * std::sin(init_yaw) + msg->pose.pose.position.y * std::cos(init_yaw) + init_y;
+            odom_yaw_ = tf2::getYaw(msg->pose.pose.orientation) + init_yaw;
             geometry_msgs::msg::TransformStamped transform_stamped;
             transform_stamped.header.stamp = msg->header.stamp;
             transform_stamped.header.frame_id = "slam_odom";
             transform_stamped.child_frame_id = "slam_base_link";
-            transform_stamped.transform.translation.x = msg->pose.pose.position.x * std::cos(init_yaw) - msg->pose.pose.position.y * std::sin(init_yaw) + init_x;
-            transform_stamped.transform.translation.y = msg->pose.pose.position.x * std::sin(init_yaw) + msg->pose.pose.position.y * std::cos(init_yaw) + init_y;
+            transform_stamped.transform.translation.x = odom_x_;
+            transform_stamped.transform.translation.y = odom_y_;
             transform_stamped.transform.translation.z = msg->pose.pose.position.z;
-            double yaw = tf2::getYaw(msg->pose.pose.orientation) + init_yaw;
-            transform_stamped.transform.rotation.z = std::sin(yaw / 2);
-            transform_stamped.transform.rotation.w = std::cos(yaw / 2);
+            transform_stamped.transform.rotation.z = std::sin(odom_yaw_ / 2);
+            transform_stamped.transform.rotation.w = std::cos(odom_yaw_ / 2);
             broadcaster_.sendTransform(transform_stamped);
         });
 
@@ -88,6 +98,7 @@ public:
                 pose_log_file_ << (this->now().nanoseconds() - first_time_.value()) / 1e9 << ",";
                 pose_log_file_ << msg->pose.pose.position.x << "," << msg->pose.pose.position.y << "," << tf2::getYaw(msg->pose.pose.orientation) << ",";
                 pose_log_file_ << tf_map_to_slam_base_link.transform.translation.x << "," << tf_map_to_slam_base_link.transform.translation.y << "," << tf2::getYaw(tf_map_to_slam_base_link.transform.rotation) << ",";
+                pose_log_file_ << odom_x_ << "," << odom_y_ << "," << odom_yaw_ << ",";
                 pose_log_file_ << std::endl;
             }
         });
@@ -96,6 +107,26 @@ public:
             sensor_msgs::msg::LaserScan scan_msg = *msg;
             scan_msg.header.frame_id = "slam_laser";
             scan_pub->publish(scan_msg);
+        });
+
+        static auto umap_sub = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>("umap_pos", 1, [&](geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg) {
+            geometry_msgs::msg::TransformStamped tf_map_to_slam_base_link;
+            try {
+                tf_map_to_slam_base_link = tf_buffer_.lookupTransform("map", "slam_base_link", msg->header.stamp);
+            }
+            catch (tf2::TransformException& ex) {
+                // RCLCPP_ERROR(this->get_logger(), "Transform error: %s", ex.what());
+                try {
+                    tf_map_to_slam_base_link = tf_buffer_.lookupTransform("map", "slam_base_link", rclcpp::Time(0));
+                }
+                catch (tf2::TransformException& ex) {
+                    RCLCPP_ERROR(this->get_logger(), "Transform error: %s", ex.what());
+                    return;
+                }
+            }
+            umap_log_file_ << tf_map_to_slam_base_link.transform.translation.x << "," << tf_map_to_slam_base_link.transform.translation.y << "," << tf2::getYaw(tf_map_to_slam_base_link.transform.rotation) << ",";
+            umap_log_file_ << msg->pose.pose.position.x << "," << msg->pose.pose.position.y << "," << tf2::getYaw(msg->pose.pose.orientation) << ",";
+            umap_log_file_ << std::endl;
         });
 
         // static visualization_msgs::msg::MarkerArray marker_array;

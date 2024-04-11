@@ -24,8 +24,14 @@ def generate_launch_description():
             arguments=['-d', os.path.join(get_package_share_directory("bringup"), "config", "rviz_config.rviz")]
         ),
 
+        Node(
+            package='visualizer',
+            executable='visualizer',
+            output='screen'
+        ),
+
         launch.actions.ExecuteProcess(
-            cmd=['ros2', 'bag', 'play', 'rosbag/panorama_d4f_scout_continuous_test7/log'],
+            cmd=['ros2', 'bag', 'play', 'rosbag/panorama_d4f_scout_continuous_test9/log'],
             output='screen'
         ),
     ]
