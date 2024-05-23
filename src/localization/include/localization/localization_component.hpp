@@ -1,3 +1,12 @@
+/**
+ * @file localization_component.hpp
+ * @author Takuma Nakao
+ * @brief センサフュージョンによるロボットの位置推定を行うコンポーネント
+ * @date 2024-05-23
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #pragma once
 
 #include <rclcpp/rclcpp.hpp>

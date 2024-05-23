@@ -1,3 +1,12 @@
+/**
+ * @file math_util.hpp
+ * @author Takuma Nakao
+ * @brief 数学関連ヘルパー関数
+ * @date 2024-05-23
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #pragma once
 #include <cmath>
 #include <cassert>

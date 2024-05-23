@@ -1,3 +1,12 @@
+/**
+ * @file kd_tree.hpp
+ * @author Takuma Nakao
+ * @brief KD木
+ * @date 2024-05-23
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #pragma once
 
 #include <array>

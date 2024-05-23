@@ -1,3 +1,12 @@
+/**
+ * @file state_transition.hpp
+ * @author Takuma Nakao
+ * @brief カルマンフィルタのモデル更新
+ * @date 2024-05-23
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #pragma once
 
 #include "matrix_types.hpp"

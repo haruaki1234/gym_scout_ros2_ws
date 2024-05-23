@@ -1,3 +1,12 @@
+/**
+ * @file umap_image_sender.hpp
+ * @author Takuma Nakao
+ * @brief UMap画像送信クライアント
+ * @date 2024-05-23
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #pragma once
 
 #include <string>

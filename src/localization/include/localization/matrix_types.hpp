@@ -1,3 +1,12 @@
+/**
+ * @file matrix_types.hpp
+ * @author Takuma Nakao
+ * @brief Eigenの型定義
+ * @date 2024-05-23
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #pragma once
 
 #include <Eigen/Core>

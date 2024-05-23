@@ -1,3 +1,12 @@
+/**
+ * @file time_delay_kalman_filter.hpp
+ * @author Takuma Nakao
+ * @brief 遅延保証付きカルマンフィルタ
+ * @date 2024-05-23
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #pragma once
 
 #include "kalman_filter.hpp"

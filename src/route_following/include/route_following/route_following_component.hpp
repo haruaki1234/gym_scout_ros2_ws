@@ -1,3 +1,12 @@
+/**
+ * @file route_following_component.hpp
+ * @author Takuma Nakao
+ * @brief 局所的経路計画による経路追従
+ * @date 2024-05-23
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #pragma once
 
 #include <functional>

@@ -1,3 +1,12 @@
+/**
+ * @file eigen_hash.hpp
+ * @author Takuma Nakao
+ * @brief Eigenの型に対するハッシュ関数
+ * @date 2024-05-23
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #pragma once
 
 #include <Eigen/Core>

@@ -1,3 +1,12 @@
+/**
+ * @file kalman_filter.hpp
+ * @author Takuma Nakao
+ * @brief Kalman Filter
+ * @date 2024-05-23
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #pragma once
 
 #include <Eigen/Core>

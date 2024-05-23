@@ -1,3 +1,12 @@
+/**
+ * @file aged_object_queue.hpp
+ * @author Takuma Nakao
+ * @brief 寿命付きオブジェクトキュー
+ * @date 2024-05-23
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #pragma once
 
 #include <queue>

@@ -1,3 +1,12 @@
+/**
+ * @file hyper_parameters.hpp
+ * @author Takuma Nakao
+ * @brief EKF用ハイパーパラメータ
+ * @date 2024-05-23
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #pragma once
 
 #include <rclcpp/rclcpp.hpp>

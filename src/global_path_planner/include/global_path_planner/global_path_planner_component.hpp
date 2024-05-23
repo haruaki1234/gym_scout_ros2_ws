@@ -1,3 +1,12 @@
+/**
+ * @file global_path_planner_component.hpp
+ * @author Takuma Nakao
+ * @brief 大域的経路計画を行うコンポーネント
+ * @date 2024-05-23
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #pragma once
 
 #include <optional>

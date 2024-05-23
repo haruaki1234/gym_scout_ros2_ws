@@ -1,3 +1,12 @@
+/**
+ * @file covariance_index.hpp
+ * @author Takuma Nakao
+ * @brief 共分散行列のインデックス
+ * @date 2024-05-23
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #pragma once
 
 namespace tlab

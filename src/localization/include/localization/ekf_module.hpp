@@ -1,3 +1,13 @@
+/**
+ * @file ekf_module.hpp
+ * @author Takuma Nakao
+ * @brief 拡張カルマンフィルタモジュール
+ * @date 2024-05-23
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
+
 #pragma once
 
 #include <memory>

@@ -1,3 +1,12 @@
+/**
+ * @file controller_component.hpp
+ * @author Takuma Nakao
+ * @brief 目標位置に到達するたびに次の目標位置を設定するコンポーネント
+ * @date 2024-05-23
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #pragma once
 
 #include <random>

@@ -1,3 +1,12 @@
+/**
+ * @file state_index.hpp
+ * @author Takuma Nakao
+ * @brief 状態ベクトルのインデックス
+ * @date 2024-05-23
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #pragma once
 
 namespace tlab

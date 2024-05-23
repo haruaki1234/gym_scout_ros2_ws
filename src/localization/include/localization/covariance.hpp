@@ -1,3 +1,13 @@
+/**
+ * @file covariance.hpp
+ * @author Takuma Nakao
+ * @brief 共分散ヘルパー関数
+ * @date 2024-05-23
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
+
 #pragma once
 
 #include "utils/covariance_index.hpp"

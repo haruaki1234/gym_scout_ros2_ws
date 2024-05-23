@@ -1,3 +1,12 @@
+/**
+ * @file velocity_control_component.hpp
+ * @author Takuma Nakao
+ * @brief 速度制御コンポーネント
+ * @date 2024-05-23
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #pragma once
 
 #include <random>

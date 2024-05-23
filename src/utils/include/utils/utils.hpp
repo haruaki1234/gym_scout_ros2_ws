@@ -1,3 +1,12 @@
+/**
+ * @file utils.hpp
+ * @author Takuma Nakao
+ * @brief ROS2ユーティリティ関数
+ * @date 2024-05-23
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #pragma once
 
 #include <tf2/utils.h>

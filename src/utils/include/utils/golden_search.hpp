@@ -1,3 +1,12 @@
+/**
+ * @file golden_search.hpp
+ * @author Takuma Nakao
+ * @brief 黄金分割法
+ * @date 2024-05-23
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #pragma once
 
 #include <functional>
@@ -39,4 +48,4 @@ static T golden_search(std::function<double(T)> f, const T low, const T high, in
     return 0.5 * (left + right);
 }
 
-}
+} // namespace tlab
