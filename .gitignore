@@ -3,4 +3,6 @@ build/
 install/
 log/
 rosbag/
+doxygen-awesome-css/
+html/
 *.pyc
