@@ -23,16 +23,36 @@
 namespace tlab
 {
 
+/**
+ * @brief　コントローラノード
+ *
+ */
 class Controller : public rclcpp::Node {
 private:
+    //! Scoutステータスメッセージ
     scout_msgs::msg::ScoutStatus::SharedPtr scout_status_msg_;
+    //! 現在の状態
     int state_ = -1;
+    //! 目標経由点のインデックス
     int target_index_ = 0;
+    //! 経路追従モードの状態
     std::string route_follow_state_ = "wait_global_path";
+    //! 待機開始時間
     rclcpp::Time wait_start_time_;
 
 public:
+    /**
+     * @brief Construct a new Controller object
+     *
+     * @param options
+     */
     Controller(const rclcpp::NodeOptions& options) : Controller("", options) {}
+    /**
+     * @brief Construct a new Controller object
+     *
+     * @param name_space
+     * @param options
+     */
     Controller(const std::string& name_space = "", const rclcpp::NodeOptions& options = rclcpp::NodeOptions()) : Node("controller_node", name_space, options)
     {
         using namespace std::chrono_literals;

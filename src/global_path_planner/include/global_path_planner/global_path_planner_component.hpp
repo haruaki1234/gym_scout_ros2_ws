@@ -30,17 +30,37 @@
 namespace tlab
 {
 
+/**
+ * @brief 大域的経路計画ノード
+ *
+ */
 class GlobalPathPlanner : public rclcpp::Node {
 private:
+    //! A*アルゴリズムクラス
     AStar a_star_;
+    //! グリッド解像度
     double resolution_ = 0.1;
+    //! 障害物の位置インデックス
     std::unordered_set<Eigen::Vector2i> map_;
+    //! 現在位置
     Eigen::Vector3d current_pos_;
 
+    //! グリッドセルメッセージ
     nav_msgs::msg::GridCells grid_msg_;
 
 public:
+    /**
+     * @brief Construct a new Global Path Planner object
+     *
+     * @param options
+     */
     GlobalPathPlanner(const rclcpp::NodeOptions& options) : GlobalPathPlanner("", options) {}
+    /**
+     * @brief Construct a new Global Path Planner object
+     *
+     * @param name_space
+     * @param options
+     */
     GlobalPathPlanner(const std::string& name_space = "", const rclcpp::NodeOptions& options = rclcpp::NodeOptions()) : Node("global_path_planner_node", name_space, options)
     {
         using namespace std::chrono_literals;
