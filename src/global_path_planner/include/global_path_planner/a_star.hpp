@@ -45,9 +45,9 @@ private:
          * @brief Construct a new Node object
          *
          * @param _pos 位置インデックス
-         * @param _g　スタート地点からのコスト
-         * @param _h　ゴール地点までの推定コスト
-         * @param _parent　親ノードポインタ
+         * @param _g スタート地点からのコスト
+         * @param _h ゴール地点までの推定コスト
+         * @param _parent 親ノードポインタ
          */
         Node(Eigen::Vector2i _pos, double _g, double _h, Node::SharedPtr _parent) : pos(_pos), g(_g), h(_h), parent(_parent) {}
 
@@ -92,10 +92,10 @@ public:
     /**
      * @brief A*経路探索
      *
-     * @param start　スタート位置インデックス
-     * @param goal　ゴール位置インデックス
-     * @param map　障害物の位置インデックス
-     * @return std::vector<Eigen::Vector2i>　経路インデックスベクトル
+     * @param start スタート位置インデックス
+     * @param goal ゴール位置インデックス
+     * @param map 障害物の位置インデックス
+     * @return std::vector<Eigen::Vector2i> 経路インデックスベクトル
      */
     std::vector<Eigen::Vector2i> find_path(const Eigen::Vector2i& start, const Eigen::Vector2i goal, const std::unordered_set<Eigen::Vector2i>& map) const
     {

@@ -45,6 +45,10 @@
 namespace tlab
 {
 
+/**
+ * @brief 拡張カルマンフィルタモジュール
+ *
+ */
 class EKFModule {
 private:
     using PoseWithCovariance = geometry_msgs::msg::PoseWithCovarianceStamped;
@@ -53,6 +57,12 @@ private:
     using Twist = geometry_msgs::msg::TwistStamped;
 
 public:
+    /**
+     * @brief Construct a new EKFModule object
+     *
+     * @param node ROS2ノードポインタ
+     * @param params ハイパーパラメータ
+     */
     EKFModule(rclcpp::Node* node, const HyperParameters params) :
         node_(node), params_(params), //
         dim_x_(6),                    // x, y, yaw, vx, vy, wz
@@ -68,6 +78,11 @@ public:
         kalman_filter_.init(X, P, params_.extend_state_step);
     }
 
+    /**
+     * @brief 初期化
+     *
+     * @param initial_pose 初期位置姿勢
+     */
     void initialize(const PoseWithCovariance& initial_pose)
     {
         Eigen::MatrixXd X(dim_x_, 1);
@@ -91,6 +106,12 @@ public:
         kalman_filter_.init(X, P, params_.extend_state_step);
     }
 
+    /**
+     * @brief 現在の位置姿勢を取得
+     *
+     * @param current_time 現在時刻
+     * @return geometry_msgs::msg::PoseStamped 現在の位置姿勢
+     */
     geometry_msgs::msg::PoseStamped getCurrentPose(const rclcpp::Time& current_time) const
     {
         const double x = kalman_filter_.getXelement(IDX::X);
@@ -103,6 +124,13 @@ public:
         current_ekf_pose.pose = make_pose(x, y, yaw);
         return current_ekf_pose;
     }
+
+    /**
+     * @brief 現在速度を取得
+     *
+     * @param current_time 現在時刻
+     * @return geometry_msgs::msg::TwistStamped 現在の速度
+     */
     geometry_msgs::msg::TwistStamped getCurrentTwist(const rclcpp::Time& current_time) const
     {
         const double vx = kalman_filter_.getXelement(IDX::VX);
@@ -117,9 +145,26 @@ public:
         current_ekf_twist.twist.angular.z = wz;
         return current_ekf_twist;
     }
+    /**
+     * @brief 現在の位置姿勢の共分散を取得
+     *
+     * @return std::array<double, 36> 現在の位置姿勢の共分散
+     */
     std::array<double, 36> getCurrentPoseCovariance() const { return ekfCovarianceToPoseMessageCovariance(kalman_filter_.getLatestP()); }
+
+    /**
+     * @brief 現在の速度の共分散を取得
+     *
+     * @return std::array<double, 36> 現在の速度の共分散
+     */
     std::array<double, 36> getCurrentTwistCovariance() const { return ekfCovarianceToTwistMessageCovariance(kalman_filter_.getLatestP()); }
 
+    /**
+     * @brief 指定された時間に最も近い遅延時間のインデックスを取得
+     *
+     * @param target_value 時刻
+     * @return size_t 遅延時間のインデックス
+     */
     size_t find_closest_delay_time_index(double target_value) const
     {
         // If target_value is too large, return last index + 1
@@ -148,6 +193,11 @@ public:
         }
     }
 
+    /**
+     * @brief 遅延時間を蓄積
+     *
+     * @param dt 経過時間
+     */
     void accumulate_delay_time(const double dt)
     {
         // Shift the delay times to the right.
@@ -160,6 +210,11 @@ public:
         }
     }
 
+    /**
+     * @brief 遅延保証予測
+     *
+     * @param dt 経過時間
+     */
     void predictWithDelay(const double dt)
     {
         const Eigen::MatrixXd X_curr = kalman_filter_.getLatestX();
@@ -176,6 +231,14 @@ public:
         kalman_filter_.predictWithDelay(X_next, A, Q);
     }
 
+    /**
+     * @brief 位置姿勢の計測更新
+     *
+     * @param pose 位置姿勢
+     * @param t_curr 位置姿勢計測時刻
+     * @retval true 成功
+     * @retval false 失敗
+     */
     bool measurementUpdatePose(const PoseWithCovariance& pose, const rclcpp::Time& t_curr)
     {
         if (pose.header.frame_id != params_.pose_frame_id) {
@@ -246,6 +309,14 @@ public:
         return true;
     }
 
+    /**
+     * @brief 速度の計測更新
+     *
+     * @param twist 速度
+     * @param t_curr 速度計測時刻
+     * @retval true 成功
+     * @retval false 失敗
+     */
     bool measurementUpdateTwist(const TwistWithCovariance& twist, const rclcpp::Time& t_curr)
     {
         const Eigen::MatrixXd X_curr = kalman_filter_.getLatestX();
@@ -303,12 +374,17 @@ public:
     }
 
 private:
+    //! ROS2ノードポインタ
     rclcpp::Node* node_;
+    //! ハイパーパラメータ
     const HyperParameters params_;
 
+    //! 遅延保証拡張カルマンフィルタ
     TimeDelayKalmanFilter kalman_filter_;
 
+    //! 状態量の次元
     const int dim_x_;
+    //! 遅延時間の蓄積ベクトル
     std::vector<double> accumulated_delay_times_;
 };
 

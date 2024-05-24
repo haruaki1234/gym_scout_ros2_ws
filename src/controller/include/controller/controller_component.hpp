@@ -24,7 +24,7 @@ namespace tlab
 {
 
 /**
- * @brief　コントローラノード
+ * @brief コントローラノード
  *
  */
 class Controller : public rclcpp::Node {

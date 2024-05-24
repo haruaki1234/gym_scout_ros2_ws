@@ -18,6 +18,12 @@
 namespace tlab
 {
 
+/**
+ * @brief EKFの共分散行列からPoseの共分散に変換
+ *
+ * @param P EKFの共分散行列
+ * @return std::array<double, 36> Poseの共分散
+ */
 static inline std::array<double, 36> ekfCovarianceToPoseMessageCovariance(const Matrix6d& P)
 {
     std::array<double, 36> covariance;
@@ -36,6 +42,12 @@ static inline std::array<double, 36> ekfCovarianceToPoseMessageCovariance(const 
     return covariance;
 }
 
+/**
+ * @brief EKFの共分散行列からTwistの共分散に変換
+ *
+ * @param P EKFの共分散行列
+ * @return std::array<double, 36> Twistの共分散
+ */
 static inline std::array<double, 36> ekfCovarianceToTwistMessageCovariance(const Matrix6d& P)
 {
     std::array<double, 36> covariance;
