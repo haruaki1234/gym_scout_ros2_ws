@@ -35,39 +35,69 @@
 namespace tlab
 {
 
+/**
+ * @brief 位置推定ノード
+ *
+ */
 class Localization : public rclcpp::Node {
 private:
+    //! ハイパーパラメータ
     const HyperParameters params_;
 
+    //! EKFの予測周期
     double ekf_dt_;
 
+    //! 位置情報キュー
     AgedObjectQueue<geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr> pose_queue_;
+    //! 速度情報キュー
     AgedObjectQueue<geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr> twist_queue_;
 
+    //! TFブロードキャスター
     tf2_ros::TransformBroadcaster broadcaster_;
 
+    //! ストップウォッチ
     StopWatch<std::chrono::milliseconds> stop_watch_;
+    //! 最後の予測時間
     std::shared_ptr<const rclcpp::Time> last_predict_time_;
 
+    //! EKFモジュール
     std::unique_ptr<EKFModule> ekf_module_;
 
-    /* process noise variance for discrete model */
-    double proc_cov_yaw_d_;      //!< @brief  discrete yaw process noise
-    double proc_cov_yaw_bias_d_; //!< @brief  discrete yaw bias process noise
-    double proc_cov_vx_d_;       //!< @brief  discrete process noise in d_vx=0
-    double proc_cov_vy_d_;       //!< @brief  discrete process noise in d_vy=0
-    double proc_cov_wz_d_;       //!< @brief  discrete process noise in d_wz=0
+    //! discrete yaw process noise
+    double proc_cov_yaw_d_;
+    //! discrete yaw bias process noise
+    double proc_cov_yaw_bias_d_;
+    //! discrete process noise in d_vx=0
+    double proc_cov_vx_d_;
+    //! discrete process noise in d_vy=0
+    double proc_cov_vy_d_;
+    //! discrete process noise in d_wz=0
+    double proc_cov_wz_d_;
 
+    //! 推定位置姿勢publisher
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pub_pose_;
+    //! 共分散付き推定位置姿勢publisher
     rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr pub_pose_cov_;
+    //! オドメトリpublisher
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pub_odom_;
+    //! 推定速度publisher
     rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr pub_twist_;
+    //! 共分散付き推定速度publisher
     rclcpp::Publisher<geometry_msgs::msg::TwistWithCovarianceStamped>::SharedPtr pub_twist_cov_;
-    rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pub_biased_pose_;
-    rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr pub_biased_pose_cov_;
 
 public:
+    /**
+     * @brief Construct a new Localization object
+     *
+     * @param options
+     */
     Localization(const rclcpp::NodeOptions& options) : Localization("", options) {}
+    /**
+     * @brief Construct a new Localization object
+     *
+     * @param name_space
+     * @param options
+     */
     Localization(const std::string& name_space = "", const rclcpp::NodeOptions& options = rclcpp::NodeOptions()) :
         Node("localization_node", name_space, options), //
         params_(this),                                  //
@@ -182,6 +212,11 @@ public:
     }
 
 private:
+    /**
+     * @brief 予測周期を更新する
+     *
+     * @param current_time 現在時刻
+     */
     void updatePredictFrequency(const rclcpp::Time& current_time)
     {
         if (last_predict_time_) {
@@ -214,6 +249,12 @@ private:
         last_predict_time_ = std::make_shared<const rclcpp::Time>(current_time);
     }
 
+    /**
+     * @brief 推定結果をpublishする
+     *
+     * @param current_ekf_pose 推定位置姿勢
+     * @param current_ekf_twist 推定速度
+     */
     void publishEstimateResult(const geometry_msgs::msg::PoseStamped& current_ekf_pose, const geometry_msgs::msg::TwistStamped& current_ekf_twist)
     {
         /* publish latest pose */

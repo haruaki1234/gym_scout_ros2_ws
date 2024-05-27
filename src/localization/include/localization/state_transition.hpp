@@ -15,8 +15,21 @@
 namespace tlab
 {
 
+/**
+ * @brief 角度の正規化
+ *
+ * @param yaw 角度
+ * @return double 正規化された角度
+ */
 double normalizeYaw(const double& yaw) { return std::atan2(std::sin(yaw), std::cos(yaw)); }
 
+/**
+ * @brief 次の状態を予測
+ *
+ * @param X_curr 現在の状態
+ * @param dt 時間差分
+ * @return Vector6d 次の状態
+ */
 /*  == Nonlinear model ==
  *
  * x_{k+1}   = x_k + (vx_k * cos(yaw_k) - vy_k * sin(yaw_k)) * dt
@@ -45,6 +58,13 @@ Vector6d predictNextState(const Vector6d& X_curr, const double dt)
     return X_next;
 }
 
+/**
+ * @brief 状態遷移行列を計算
+ *
+ * @param X_curr 現在の状態
+ * @param dt 時間差分
+ * @return Matrix6d 状態遷移行列
+ */
 /*  == Linearized model ==
  *
  * A = [ 1, 0, (-vx*sin(yaw)-vy*cos(yaw))*dt, cos(yaw)*dt, -sin(yaw)*dt,   0]
@@ -71,6 +91,15 @@ Matrix6d createStateTransitionMatrix(const Vector6d& X_curr, const double dt)
     return A;
 }
 
+/**
+ * @brief プロセスノイズの共分散行列を計算
+ *
+ * @param proc_cov_yaw_d 角速度の分散
+ * @param proc_cov_vx_d 速度の分散
+ * @param proc_cov_vy_d 速度の分散
+ * @param proc_cov_wz_d 角速度の分散
+ * @return Matrix6d プロセスノイズの共分散行列
+ */
 Matrix6d processNoiseCovariance(const double proc_cov_yaw_d, const double proc_cov_vx_d, const double proc_cov_vy_d, const double proc_cov_wz_d)
 {
     Matrix6d Q = Matrix6d::Zero();

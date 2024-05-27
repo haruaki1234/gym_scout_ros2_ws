@@ -11,5 +11,7 @@
 
 #include <Eigen/Core>
 
+//! 6次元ベクトルの型エイリアス
 using Vector6d = Eigen::Matrix<double, 6, 1>;
+//! 6x6行列の型エイリアス
 using Matrix6d = Eigen::Matrix<double, 6, 6>;
