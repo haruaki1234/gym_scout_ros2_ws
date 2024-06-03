@@ -14,6 +14,16 @@
 namespace tlab
 {
 
+/**
+ * @brief 黄金分割法
+ *
+ * @tparam T 最適化変数の型
+ * @param f 目的関数
+ * @param low 下限値
+ * @param high 上限値
+ * @param loop_num ループ回数
+ * @return T 最適化結果
+ */
 template<typename T>
 static T golden_search(std::function<double(T)> f, const T low, const T high, int loop_num = 5)
 {

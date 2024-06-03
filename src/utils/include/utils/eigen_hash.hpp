@@ -14,8 +14,21 @@
 namespace std
 {
 
+/**
+ * @brief Eigen Matrixのハッシュ関数
+ *
+ * @tparam Scalar Matrixの要素型
+ * @tparam Rows 行数
+ * @tparam Cols 列数
+ */
 template<typename Scalar, int Rows, int Cols>
 struct hash<Eigen::Matrix<Scalar, Rows, Cols>> {
+    /**
+     * @brief ハッシュ関数
+     *
+     * @param matrix Matrix
+     * @return size_t ハッシュ値
+     */
     size_t operator()(const Eigen::Matrix<Scalar, Rows, Cols>& matrix) const
     {
         size_t seed = 0;
