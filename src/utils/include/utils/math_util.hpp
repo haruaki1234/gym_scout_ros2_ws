@@ -27,7 +27,7 @@ constexpr double PI = 3.1415926535897932384626433832795;
 constexpr double HALF_PI = PI / 2.0;
 //! 円周率の2倍
 constexpr double TWO_PI = PI * 2.0;
-弧度法からラジアン法への変換係数
+//! 弧度法からラジアン法への変換係数
 constexpr double DEG_TO_RAD = PI / 180.0;
 //! ラジアン法から弧度法への変換係数
 constexpr double RAD_TO_DEG = 180.0 / PI;
