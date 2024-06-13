@@ -1,3 +1,12 @@
+/**
+ * @file visualizer_component.hpp
+ * @author Takuma Nakao
+ * @brief ビジュアライザーコンポーネント
+ * @date 2024-05-23
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #pragma once
 
 #include <rclcpp/rclcpp.hpp>
@@ -10,7 +19,18 @@ namespace tlab
 
 class Visualizer : public rclcpp::Node {
 public:
+    /**
+     * @brief Construct a new Visualizer object
+     *
+     * @param options
+     */
     Visualizer(const rclcpp::NodeOptions& options) : Visualizer("", options) {}
+    /**
+     * @brief Construct a new Visualizer object
+     *
+     * @param name_space
+     * @param options
+     */
     Visualizer(const std::string& name_space = "", const rclcpp::NodeOptions& options = rclcpp::NodeOptions()) : Node("visualizer_node", name_space, options)
     {
         using namespace std::chrono_literals;

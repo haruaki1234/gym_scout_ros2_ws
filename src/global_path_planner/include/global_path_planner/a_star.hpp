@@ -1,3 +1,12 @@
+/**
+ * @file a_star.hpp
+ * @author Takuma Nakao
+ * @brief A*アルゴリズム
+ * @date 2024-05-23
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #pragma once
 
 #include <vector>
@@ -12,35 +21,82 @@
 namespace tlab
 {
 
+/**
+ * @brief A*アルゴリズムを解くクラス
+ *
+ */
 class AStar {
 private:
+    /**
+     * @brief グリッドノードクラス
+     *
+     */
     class Node {
     public:
+        //! shared_ptrの型エイリアス
         using SharedPtr = std::shared_ptr<Node>;
+
+        /**
+         * @brief Construct a new Node object
+         *
+         */
         Node() : pos(Eigen::Vector2i::Zero()), g(0), h(0), parent(nullptr) {}
+        /**
+         * @brief Construct a new Node object
+         *
+         * @param _pos 位置インデックス
+         * @param _g スタート地点からのコスト
+         * @param _h ゴール地点までの推定コスト
+         * @param _parent 親ノードポインタ
+         */
         Node(Eigen::Vector2i _pos, double _g, double _h, Node::SharedPtr _parent) : pos(_pos), g(_g), h(_h), parent(_parent) {}
+
+        //! 位置インデックス
         Eigen::Vector2i pos;
+        //! スタート地点からのコスト
         double g;
+        //! ゴール地点までの推定コスト
         double h;
+        //! 親ノードポインタ
         Node::SharedPtr parent;
+
+        //! コストの合計
         double cost() const { return g + h; }
+
         friend bool operator<(const Node& lhs, const Node& rhs) { return lhs.cost() < rhs.cost(); }
         friend bool operator>(const Node& lhs, const Node& rhs) { return rhs < lhs; }
         friend bool operator<=(const Node& lhs, const Node& rhs) { return !(lhs > rhs); }
         friend bool operator>=(const Node& lhs, const Node& rhs) { return !(lhs < rhs); }
     };
 
+    //! 4方向の移動方向
     inline static const std::vector<Eigen::Vector2i> directions_4_ = {Eigen::Vector2i(1, 0), Eigen::Vector2i(0, 1), Eigen::Vector2i(-1, 0), Eigen::Vector2i(0, -1)};
+    //! 8方向の移動方向
     inline static const std::vector<Eigen::Vector2i> directions_8_ = {Eigen::Vector2i(1, 0), Eigen::Vector2i(1, 1), Eigen::Vector2i(0, 1), Eigen::Vector2i(-1, 1), Eigen::Vector2i(-1, 0), Eigen::Vector2i(-1, -1), Eigen::Vector2i(0, -1), Eigen::Vector2i(1, -1)};
 
+    //! 斜め移動を許可するか
     bool is_diagonal_movement_ = false;
+    //! 壁の探索範囲
     int wall_search_range_ = 3;
+    //! 壁のコストの重み
     double wall_cost_waight_ = 1.0;
 
 public:
+    //! 斜め移動を許可するかを設定
     void set_diagonal_movement(bool is_diagonal_movement) { is_diagonal_movement_ = is_diagonal_movement; }
+    //! 壁の探索範囲を設定
     void set_wall_search_range(int wall_search_range) { wall_search_range_ = wall_search_range; }
+    //! 壁のコストの重みを設定
     void set_wall_cost_waight(double wall_cost_waight) { wall_cost_waight_ = wall_cost_waight; }
+
+    /**
+     * @brief A*経路探索
+     *
+     * @param start スタート位置インデックス
+     * @param goal ゴール位置インデックス
+     * @param map 障害物の位置インデックス
+     * @return std::vector<Eigen::Vector2i> 経路インデックスベクトル
+     */
     std::vector<Eigen::Vector2i> find_path(const Eigen::Vector2i& start, const Eigen::Vector2i goal, const std::unordered_set<Eigen::Vector2i>& map) const
     {
         std::vector<Node::SharedPtr> open;

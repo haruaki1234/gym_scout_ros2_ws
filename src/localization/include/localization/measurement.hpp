@@ -1,3 +1,12 @@
+/**
+ * @file measurement.hpp
+ * @author Takuma Nakao
+ * @brief 行列代入のヘルパー関数
+ * @date 2024-05-23
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #pragma once
 
 #include <Eigen/Core>
@@ -9,6 +18,11 @@
 namespace tlab
 {
 
+/**
+ * @brief 位置姿勢の計測行列
+ *
+ * @return Eigen::Matrix<double, 3, 6> 位置姿勢の計測行列
+ */
 static inline Eigen::Matrix<double, 3, 6> poseMeasurementMatrix()
 {
     Eigen::Matrix<double, 3, 6> C = Eigen::Matrix<double, 3, 6>::Zero();
@@ -18,6 +32,11 @@ static inline Eigen::Matrix<double, 3, 6> poseMeasurementMatrix()
     return C;
 }
 
+/**
+ * @brief 速度の計測行列
+ *
+ * @return Eigen::Matrix<double, 3, 6> 速度姿勢の計測行列
+ */
 static inline Eigen::Matrix<double, 3, 6> twistMeasurementMatrix()
 {
     Eigen::Matrix<double, 3, 6> C = Eigen::Matrix<double, 3, 6>::Zero();
@@ -27,6 +46,13 @@ static inline Eigen::Matrix<double, 3, 6> twistMeasurementMatrix()
     return C;
 }
 
+/**
+ * @brief 位置姿勢の計測共分散
+ *
+ * @param covariance 共分散行列
+ * @param smoothing_step スムージングステップ
+ * @return Eigen::Matrix3d 位置姿勢の計測共分散
+ */
 static inline Eigen::Matrix3d poseMeasurementCovariance(const std::array<double, 36ul>& covariance, const size_t smoothing_step)
 {
     Eigen::Matrix3d R;
@@ -35,6 +61,13 @@ static inline Eigen::Matrix3d poseMeasurementCovariance(const std::array<double,
     return R * static_cast<double>(smoothing_step);
 }
 
+/**
+ * @brief 速度の計測共分散
+ *
+ * @param covariance 共分散行列
+ * @param smoothing_step スムージングステップ
+ * @return Eigen::Matrix3d 速度の計測共分散
+ */
 static inline Eigen::Matrix3d twistMeasurementCovariance(const std::array<double, 36ul>& covariance, const size_t smoothing_step)
 {
     Eigen::Matrix3d R;

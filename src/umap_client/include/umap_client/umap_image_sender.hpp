@@ -1,3 +1,12 @@
+/**
+ * @file umap_image_sender.hpp
+ * @author Takuma Nakao
+ * @brief UMap画像送信クライアント
+ * @date 2024-05-23
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #pragma once
 
 #include <string>
@@ -13,39 +22,80 @@
 namespace umap
 {
 
+/**
+ * @brief VGM画像送信クラス
+ *
+ */
 class UmapImageSender {
 public:
+    /**
+     * @brief 位置姿勢
+     *
+     */
     struct pose_t {
-        float x = 0;
-        float y = 0;
-        float z = 0;
-        float roll = 0;
-        float pitch = 0;
-        float yaw = 0;
+        float x = 0;     //!< 位置X
+        float y = 0;     //!< 位置Y
+        float z = 0;     //!< 位置Z
+        float roll = 0;  //!< 姿勢Roll
+        float pitch = 0; //!< 姿勢Pitch
+        float yaw = 0;   //!< 姿勢Yaw
+        /**
+         * @brief Construct a new pose t object
+         *
+         * @param _x 位置X
+         * @param _y 位置Y
+         * @param _z 位置Z
+         * @param _roll 姿勢Roll
+         * @param _pitch 姿勢Pitch
+         * @param _yaw 姿勢Yaw
+         */
         pose_t(float _x = 0, float _y = 0, float _z = 0, float _roll = 0, float _pitch = 0, float _yaw = 0) : x(_x), y(_y), z(_z), roll(_roll), pitch(_pitch), yaw(_yaw) {}
     };
+    /**
+     * @brief VGM推定結果
+     *
+     */
     struct result_t {
-        pose_t pose;
-        float similar;
-        float similar_average;
-        float similar_variance;
+        pose_t pose;            //!< 位置姿勢
+        float similar;          //!< 類似度
+        float similar_average;  //!< 類似度平均
+        float similar_variance; //!< 類似度分散
     };
+    /**
+     * @brief 線検出タイプ
+     *
+     */
     enum class LineDetectionType { CANNY, LSD, FLD };
 
+    //! 推定結果を返送してもらうか
     bool is_return = true;
+    //! キャリブレーション済みか
     bool is_calibrated = true;
+    //! リサイズ済みか
     bool is_resized = true;
+    //! 線検出済みか
     bool is_line_detected = true;
+    //! 線検出タイプ
     LineDetectionType line_detection_type = LineDetectionType::CANNY;
 
+    //! タイムアウト時間[ms]
     int dead_time_ms = 1000;
 
 private:
+    //! サーバアドレス
     std::string address_ = "";
+    //! サーバポート
     int port_ = 0;
+    //! デバイスID
     std::string device_id_ = "";
+    //! カメラ番号
     int camera_number_ = 0;
 
+    /**
+     * @brief ファイル名の作成
+     *
+     * @return std::string ファイル名
+     */
     std::string make_file_name() const
     {
         std::stringstream file_name;
@@ -114,7 +164,24 @@ private:
     }
 
 public:
+    /**
+     * @brief Construct a new Umap Image Sender object
+     *
+     * @param address サーバアドレス
+     * @param port サーバポート
+     * @param device_id デバイスID
+     * @param camera_number カメラ番号
+     */
     UmapImageSender(const std::string& address, int port, const std::string& device_id, int camera_number) : address_(address), port_(port), device_id_(device_id), camera_number_(camera_number) {}
+    /**
+     * @brief cv::Mat画像を送信する
+     *
+     * @param img クエリ画像
+     * @param pose 推定初期位置
+     * @param matching_distance マッチング位置範囲
+     * @param matching_angle_distance マッチング角度範囲
+     * @return std::optional<result_t> 推定結果
+     */
     std::optional<result_t> send_from_mat(const cv::Mat& img, const pose_t& pose, float matching_distance, float matching_angle_distance)
     {
         using namespace std::chrono_literals;

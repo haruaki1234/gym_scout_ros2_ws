@@ -1,3 +1,12 @@
+/**
+ * @file hyper_parameters.hpp
+ * @author Takuma Nakao
+ * @brief EKF用ハイパーパラメータ
+ * @date 2024-05-23
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #pragma once
 
 #include <rclcpp/rclcpp.hpp>
@@ -8,8 +17,17 @@
 namespace tlab
 {
 
+/**
+ * @brief EKF用ハイパーパラメータクラス
+ *
+ */
 class HyperParameters {
 public:
+    /**
+     * @brief Construct a new Hyper Parameters object
+     *
+     * @param node ROS2ノードポインタ
+     */
     explicit HyperParameters(rclcpp::Node* node) :
         show_debug_info(node->declare_parameter("show_debug_info", false)),             //
         ekf_rate(node->declare_parameter("predict_frequency", 50.0)),                   //
@@ -34,25 +52,45 @@ public:
     {
     }
 
+    //! デバッグ情報を表示するかどうか
     const bool show_debug_info;
+    //! EKFの予測周波数
     const double ekf_rate;
+    //! EKFの予測周期
     const double ekf_dt;
+    //! TFの更新周波数
     const double tf_rate_;
+    //! パブリッシュの周波数
     const bool publish_tf_;
+    //! 最大遅れ保証ステップ数
     const int extend_state_step;
+    //! ポーズフレームID
     const std::string pose_frame_id;
+    //! 位置姿勢計測の追加遅延
     const double pose_additional_delay;
+    //! 位置姿勢のマハラノビス距離制限
     const double pose_gate_dist;
+    //! 位置姿勢のスムージングステップ数
     const int pose_smoothing_steps;
+    //! 速度計測の追加遅延
     const double twist_additional_delay;
+    //! 速度のマハラノビス距離制限
     const double twist_gate_dist;
+    //! 速度のスムージングステップ数
     const int twist_smoothing_steps;
-    const double proc_stddev_vx_c;  //!< @brief  vx process noise
-    const double proc_stddev_vy_c;  //!< @brief  vy process noise
-    const double proc_stddev_wz_c;  //!< @brief  wz process noise
-    const double proc_stddev_yaw_c; //!< @brief  yaw process noise
+    //! vx process noise
+    const double proc_stddev_vx_c;
+    //! vy process noise
+    const double proc_stddev_vy_c;
+    //! wz process noise
+    const double proc_stddev_wz_c;
+    //! yaw process noise
+    const double proc_stddev_yaw_c;
+    //! twist vx noise
     const double twist_stddev_vx_c;
+    //! twist vy noise
     const double twist_stddev_vy_c;
+    //! twist wz noise
     const double twist_stddev_wz_c;
 };
 

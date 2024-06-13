@@ -1,3 +1,12 @@
+/**
+ * @file umap_client_component.hpp
+ * @author Takuma Nakao
+ * @brief UMapクライアントコンポーネント
+ * @date 2024-05-23
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #pragma once
 
 #include <rclcpp/rclcpp.hpp>
@@ -16,18 +25,39 @@
 namespace tlab
 {
 
+/**
+ * @brief UMapクライアントノード
+ *
+ */
 class UmapClient : public rclcpp::Node {
 private:
+    //! 画像メッセージ
     sensor_msgs::msg::Image::SharedPtr image_msg_;
+    //! 現在位置
     Eigen::Vector3d current_pos_;
+    //! 位置の共分散ノルム
     double xy_covariance_norm_;
+    //! 角度の共分散ノルム
     double theta_covariance_norm_;
 
+    //! 撮影位置
     Eigen::Vector3d take_picture_pos_;
+    //! 撮影時刻
     rclcpp::Time take_picture_time_;
 
 public:
+    /**
+     * @brief Construct a new Umap Client object
+     *
+     * @param options
+     */
     UmapClient(const rclcpp::NodeOptions& options) : UmapClient("", options) {}
+    /**
+     * @brief Construct a new Umap Client object
+     *
+     * @param name_space
+     * @param options
+     */
     UmapClient(const std::string& name_space = "", const rclcpp::NodeOptions& options = rclcpp::NodeOptions()) : Node("umap_client_node", name_space, options)
     {
         using namespace std::chrono_literals;

@@ -982,6 +982,8 @@ EXCLUDE_PATTERNS       = */glm/* \
 			 */ros2_v4l2_camera/* \
 			 */scout_ros2/* \
 			 */ugv_sdk/* \
+             */build/* \
+             */install/* \
              */doxygen-awesome-css/* \
 			 */matplotlibcpp.hpp \
 			 */progress_bar.hpp

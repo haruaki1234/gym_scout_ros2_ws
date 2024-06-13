@@ -1,3 +1,12 @@
+/**
+ * @file velocity_control_component.hpp
+ * @author Takuma Nakao
+ * @brief 速度制御コンポーネント
+ * @date 2024-05-23
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #pragma once
 
 #include <random>
@@ -13,14 +22,32 @@
 namespace tlab
 {
 
+/**
+ * @brief 速度制御ノード
+ *
+ */
 class VelocityControl : public rclcpp::Node {
 private:
+    //! 目標速度
     Eigen::Vector3d target_vel_ = Eigen::Vector3d::Zero();
+    //! 現在速度
     Eigen::Vector3d current_vel_ = Eigen::Vector3d::Zero();
+    //! 積分誤差
     Eigen::Vector3d integral_error_ = Eigen::Vector3d::Zero();
 
 public:
+    /**
+     * @brief Construct a new Velocity Control object
+     *
+     * @param options
+     */
     VelocityControl(const rclcpp::NodeOptions& options) : VelocityControl("", options) {}
+    /**
+     * @brief Construct a new Velocity Control object
+     *
+     * @param name_space
+     * @param options
+     */
     VelocityControl(const std::string& name_space = "", const rclcpp::NodeOptions& options = rclcpp::NodeOptions()) : Node("velocity_control_node", name_space, options)
     {
         using namespace std::chrono_literals;

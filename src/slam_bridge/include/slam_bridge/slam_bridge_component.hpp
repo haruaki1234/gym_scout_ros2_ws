@@ -1,3 +1,12 @@
+/**
+ * @file slam_bridge_component.hpp
+ * @author Takuma Nakao
+ * @brief SLAMブリッジコンポーネント
+ * @date 2024-05-23
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #pragma once
 
 #include <fstream>
@@ -21,25 +30,47 @@
 namespace tlab
 {
 
+/**
+ * @brief SLAMブリッジノード
+ *
+ */
 class SlamBridge : public rclcpp::Node {
 private:
+    //! TFブロードキャスター
     tf2_ros::TransformBroadcaster broadcaster_;
+    //! TFバッファ
     tf2_ros::Buffer tf_buffer_;
+    //! TFリスナー
     tf2_ros::TransformListener tf_listener_;
 
-    nav_msgs::msg::Odometry last_odom_;
-
+    //! 位置姿勢ログファイル
     std::ofstream pose_log_file_;
+    //! 初期時間
     std::optional<int64_t> first_time_ = std::nullopt;
 
+    //! VGMログファイル
     std::ofstream umap_log_file_;
 
+    //! オドメトリ位置x
     double odom_x_ = 0;
+    //! オドメトリ位置y
     double odom_y_ = 0;
+    //! オドメトリyaw
     double odom_yaw_ = 0;
 
 public:
+    /**
+     * @brief Construct a new Slam Bridge object
+     *
+     * @param options
+     */
     SlamBridge(const rclcpp::NodeOptions& options) : SlamBridge("", options) {}
+    /**
+     * @brief Construct a new Slam Bridge object
+     *
+     * @param name_space
+     * @param options
+     */
     SlamBridge(const std::string& name_space = "", const rclcpp::NodeOptions& options = rclcpp::NodeOptions()) :
         Node("slam_bridge_node", name_space, options), //
         broadcaster_(this),                            //

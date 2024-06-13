@@ -1,3 +1,12 @@
+/**
+ * @file route_following_component.hpp
+ * @author Takuma Nakao
+ * @brief 局所的経路計画による経路追従
+ * @date 2024-05-23
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #pragma once
 
 #include <functional>
@@ -24,18 +33,46 @@
 namespace tlab
 {
 
+/**
+ * @brief 経路追従ノード
+ *
+ */
 class RouteFollowing : public rclcpp::Node {
 private:
+    /**
+     * @brief 候補パスデータ
+     *
+     */
     struct local_path_data_t {
+        //! 指示速度
         Eigen::Vector3d vel;
+        //! パス
         std::vector<Eigen::Vector3d> path;
+        /**
+         * @brief Construct a new local path data t object
+         *
+         * @param _vel 指示速度
+         * @param _path パス
+         */
         local_path_data_t(const Eigen::Vector3d& _vel, const std::vector<Eigen::Vector3d>& _path) : vel(_vel), path(_path) {}
     };
 
+    /**
+     * @brief スコア計算クラス
+     *
+     */
     class Score {
     private:
+        //! 重み
         double weight_;
+        //! 評価関数
         std::function<double(const local_path_data_t&)> func_;
+        /**
+         * @brief 正規化
+         *
+         * @param data 評価値
+         * @return std::vector<double> 正規化評価値
+         */
         std::vector<double> normalize(std::vector<double> data) const
         {
             double max = -std::numeric_limits<double>::infinity();
@@ -64,7 +101,19 @@ private:
         }
 
     public:
+        /**
+         * @brief Construct a new Score object
+         *
+         * @param weight 重み
+         * @param func 評価関数
+         */
         Score(double weight, std::function<double(const local_path_data_t&)> func) : weight_(weight), func_(func) {}
+        /**
+         * @brief スコア計算
+         *
+         * @param path 候補パスベクトル
+         * @return Eigen::VectorXd 評価値
+         */
         Eigen::VectorXd operator()(const std::vector<local_path_data_t>& path) const
         {
             std::vector<double> data;
@@ -81,53 +130,100 @@ private:
         }
     };
 
+    //! 現在速度
     Eigen::Vector3d current_vel_;
+    //! 現在位置
     Eigen::Vector3d current_pos_;
+    //! 共分散ノルム
     double covariance_norm_ = 0;
+    //! UMapタイムアウト時刻
     double umap_timeout_time_ = 0;
 
+    //! グローバルパス
     std::vector<geometry_msgs::msg::PoseStamped> global_path_;
+    //! ローカル目標位置
     Eigen::Vector3d local_target_pos_;
+    //! 地図障害物
     std::optional<kd_tree::EigenVectorTree<2>> map_grid_;
 
+    //! 近傍インデックス
     int near_index_ = 0;
+    //! 初期角度制御フラグ
     bool is_start_angle_control_ = true;
 
+    //! 制御周期
     double control_period_;
+    //! 共分散ゲイン
     double covariance_gain_;
+    //! 最大速度
     double max_vel_;
+    //! 最小機体速度
     double minimum_max_vel_;
+    //! 最大加速度
     double max_acc_;
+    //! 最大角速度
     double max_angle_vel_;
+    //! 最小機体角速度
     double minimum_max_angle_vel_;
+    //! 最大角加速度
     double max_angle_acc_;
+    //! カーブ検索インデックス数
     int serch_curve_index_num_;
+    //! カーブ速度レート
     double curve_vel_rate_;
+    //! 速度分割数
     int vel_split_num_;
+    //! シミュレーション時間
     double simulation_time_;
+    //! シミュレーションステップ数
     int simulation_step_;
+    //! 衝突地図障害物距離
     double collision_map_distance_;
+    //! 無視地図障害物距離
     double ignore_map_distance_;
+    //! UMapタイムアウト停止時間閾値
     double umap_timeout_stop_time_;
 
+    //! ローカル目標位置スコアの重み
     double score_local_target_distance_waight_;
+    //! ローカル目標角度スコアの重み
     double score_local_target_angle_waight_;
+    //! 地図障害物距離スコアの重み
     double score_map_distance_waight_;
+    //! 積分誤差スコアの重み
     double score_integral_error_waight_;
 
+    //! 目標位置近傍制御への切り替え距離
     double near_goal_control_distance_;
+    //! 目標位置近傍制御位置ゲイン
     double near_goal_control_pos_kp_;
+    //! 目標位置近傍制御角度ゲイン
     double near_goal_control_angle_kp_;
 
+    //! 目標位置収束判定距離
     double goal_distance_;
 
+    //! 現在取れる最大速度
     double current_max_vel_;
+    //! 現在取れる最大角速度
     double current_max_angle_vel_;
 
+    //! スコアクラスベクトル
     std::vector<Score> scores_;
 
 public:
+    /**
+     * @brief Construct a new Route Following object
+     *
+     * @param options
+     */
     RouteFollowing(const rclcpp::NodeOptions& options) : RouteFollowing("", options) {}
+    /**
+     * @brief Construct a new Route Following object
+     *
+     * @param name_space
+     * @param options
+     */
     RouteFollowing(const std::string& name_space = "", const rclcpp::NodeOptions& options = rclcpp::NodeOptions()) : Node("route_following_node", name_space, options)
     {
         using namespace std::chrono_literals;
@@ -184,6 +280,7 @@ public:
         declare_parameter<double>("goal_distance", 1.0);
         goal_distance_ = get_parameter("goal_distance").as_double();
 
+        // 評価関数設定
         scores_.push_back(Score(score_local_target_distance_waight_, [&](const local_path_data_t& path) { return calc_score_local_target_distance(path); }));
         scores_.push_back(Score(score_local_target_angle_waight_, [&](const local_path_data_t& path) { return calc_score_local_target_angle(path); }));
         scores_.push_back(Score(score_map_distance_waight_, [&](const local_path_data_t& path) { return calc_score_map_distance(path); }));
@@ -237,6 +334,7 @@ public:
 
         static auto timer = create_wall_timer(1s * control_period_, [&]() {
             std_msgs::msg::String state_msg;
+            // グローバルパスがない場合
             if (global_path_.empty()) {
                 geometry_msgs::msg::Twist vel_msg;
                 vel_msg.linear.x = 0;
@@ -248,6 +346,7 @@ public:
                 return;
             }
 
+            // 初期角度制御モード
             if (is_start_angle_control_) {
                 Eigen::Vector3d e = make_eigen_vector3d(global_path_.front().pose) - current_pos_;
                 e.z() = normalize_angle(e.z());
@@ -264,6 +363,7 @@ public:
                 return;
             }
 
+            // ゴールに到達した場合
             if (auto goal_pos = make_eigen_vector3d(global_path_.back().pose); (goal_pos - current_pos_).head<2>().norm() < goal_distance_) {
                 global_path_.clear();
                 geometry_msgs::msg::Twist vel_msg;
@@ -275,6 +375,7 @@ public:
                 route_follow_state_pub->publish(state_msg);
                 return;
             }
+            // ゴールに近づいた場合
             else if ((goal_pos - current_pos_).head<2>().norm() < near_goal_control_distance_) {
                 auto e = goal_pos - current_pos_;
                 auto target_vel = Eigen::Vector3d(e.x() * near_goal_control_pos_kp_, e.y() * near_goal_control_pos_kp_, e.z() * near_goal_control_angle_kp_);
@@ -293,6 +394,7 @@ public:
             auto start_time = this->get_clock()->now();
 
             {
+                // グローバルパス上の最近傍インデックスを探索
                 double min_e = std::numeric_limits<double>::infinity();
                 for (size_t i = near_index_; i < global_path_.size(); i++) {
                     auto pos = Eigen::Vector2d(global_path_[i].pose.position.x, global_path_[i].pose.position.y);
@@ -305,6 +407,8 @@ public:
 
                 current_max_vel_ = max_vel_ / (1 + covariance_gain_ * covariance_norm_);
                 geometry_msgs::msg::PoseStamped before_pose = global_path_[std::max(near_index_ - serch_curve_index_num_, 0)];
+
+                // カーブでは減速する
                 double rate = 1;
                 for (int i = -serch_curve_index_num_; i <= serch_curve_index_num_; i++) {
                     auto pose = global_path_[std::clamp(near_index_ + i, 0, static_cast<int>(global_path_.size()) - 1)];
@@ -315,11 +419,14 @@ public:
                 }
                 current_max_vel_ = std::max(current_max_vel_ * rate, minimum_max_vel_);
                 current_max_angle_vel_ = std::max(max_angle_vel_ / (1 + covariance_gain_ * covariance_norm_), minimum_max_angle_vel_);
+
+                // UMapタイムアウト時は停止
                 if ((this->get_clock()->now().seconds() - umap_timeout_time_) < umap_timeout_stop_time_) {
                     current_max_vel_ = 0;
                     current_max_vel_ = 0;
                 }
 
+                // ローカル目標位置を設定
                 int target_index = near_index_;
                 double route_distance = 0;
                 auto prev_pos = Eigen::Vector2d(global_path_[near_index_].pose.position.x, global_path_[near_index_].pose.position.y);
@@ -345,6 +452,7 @@ public:
                 path_publish(p.path, candidate_path_pub);
             }
 
+            // 経路ごとのスコア計算
             Eigen::VectorXd score = Eigen::VectorXd::Zero(choices_path.size());
             for (const auto& s : scores_) {
                 score += s(choices_path);
@@ -365,6 +473,13 @@ public:
     }
 
 private:
+    /**
+     * @brief 移動位置シミュレーション
+     *
+     * @param vel 指示速度
+     * @param pos 現在位置
+     * @return std::vector<Eigen::Vector3d> 移動経路
+     */
     std::vector<Eigen::Vector3d> simulation_pos(const Eigen::Vector3d& vel, Eigen::Vector3d pos) const
     {
         std::vector<Eigen::Vector3d> pos_vec;
@@ -379,6 +494,12 @@ private:
         }
         return pos_vec;
     }
+
+    /**
+     * @brief 候補パス作成
+     *
+     * @return std::vector<local_path_data_t> 候補パス
+     */
     std::vector<local_path_data_t> make_choices_path()
     {
         auto rotate_vel = rotate_2d(current_vel_.head<2>(), -current_pos_.z());
@@ -401,8 +522,29 @@ private:
         }
         return choices_path;
     }
+
+    /**
+     * @brief ローカル目標位置評価関数
+     *
+     * @param path 経路
+     * @return double スコア
+     */
     double calc_score_local_target_distance(const local_path_data_t& path) const { return -(local_target_pos_ - path.path.back()).head<2>().norm(); }
+
+    /**
+     * @brief ローカル目標角度評価関数
+     *
+     * @param path 経路
+     * @return double スコア
+     */
     double calc_score_local_target_angle(const local_path_data_t& path) const { return -std::abs(normalize_angle((local_target_pos_ - path.path.back()).z())); }
+
+    /**
+     * @brief 地図障害物距離評価関数
+     *
+     * @param path 経路
+     * @return double スコア
+     */
     double calc_score_map_distance(const local_path_data_t& path) const
     {
         if (!map_grid_) {
@@ -421,6 +563,13 @@ private:
         }
         return score;
     }
+
+    /**
+     * @brief 積分誤差評価関数
+     *
+     * @param path 経路
+     * @return double スコア
+     */
     double calc_score_integral_error(const local_path_data_t& path) const
     {
         double score = 0;

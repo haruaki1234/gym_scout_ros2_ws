@@ -1,3 +1,12 @@
+/**
+ * @file simulator_component.hpp
+ * @author Takuma Nakao
+ * @brief シミュレータコンポーネント
+ * @date 2024-05-23
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #pragma once
 
 #include <random>
@@ -16,33 +25,66 @@
 namespace tlab
 {
 
+/**
+ * @brief シミュレータノード
+ *
+ */
 class Simulator : public rclcpp::Node {
 private:
+    //! シミュレーション周期
     double dt_ = 0.01;
+    //! ロボット最大速度
     double max_vel_ = 1.0;
+    //! ロボット最大加速度
     double max_acc_ = 1.0;
+    //! ロボット最大角速度
     double max_ang_vel_ = 1.0;
+    //! ロボット最大角加速度
     double max_ang_acc_ = 1.0;
 
+    //! VGMリクエスト周期
     double umap_request_period_ = 0.1;
+    //! VGM位置推定遅延
     double umap_localization_delay_ = 0.0;
 
+    //! ロボット目標速度
     Eigen::Vector3d target_vel_;
+    //! ロボット真値速度
     Eigen::Vector3d truth_vel_;
+    //! ロボット真値位置
     Eigen::Vector3d truth_pos_;
+    //! ロボット現在位置
     Eigen::Vector3d current_pos_;
+    //! ロボット現在速度
     Eigen::Vector3d current_vel_;
 
+    //! ロボット推定位置
     Eigen::Vector3d localization_pos_;
 
+    //! VGMリクエスト時刻
     std::optional<rclcpp::Time> umap_request_time_ = std::nullopt;
+
+    //! VGM推定位置シミュレーション結果
     Eigen::Vector3d umap_pos_;
+    //! VGMリクエスト時の推定ロボット位置
     Eigen::Vector3d umap_localization_pos_;
 
+    //! ロボット初期位置
     Eigen::Vector3d initial_pos_;
 
 public:
+    /**
+     * @brief Construct a new Simulator object
+     *
+     * @param options
+     */
     Simulator(const rclcpp::NodeOptions& options) : Simulator("", options) {}
+    /**
+     * @brief Construct a new Simulator object
+     *
+     * @param name_space
+     * @param options
+     */
     Simulator(const std::string& name_space = "", const rclcpp::NodeOptions& options = rclcpp::NodeOptions()) : Node("simulator_node", name_space, options)
     {
         using namespace std::chrono_literals;

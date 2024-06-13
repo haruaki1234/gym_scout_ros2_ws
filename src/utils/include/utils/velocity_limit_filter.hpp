@@ -1,3 +1,12 @@
+/**
+ * @file velocity_limit_filter.hpp
+ * @author Takuma Nakao
+ * @brief 速度制限フィルタ
+ * @date 2024-05-23
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #pragma once
 
 #include <algorithm>

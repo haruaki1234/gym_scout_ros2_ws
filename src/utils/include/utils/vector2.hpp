@@ -1,3 +1,12 @@
+/**
+ * @file vector2.hpp
+ * @author Takuma Nakao
+ * @brief 2次元ベクトル
+ * @date 2024-05-23
+ *
+ * @copyright Copyright (c) 2024
+ *
+ */
 #pragma once
 
 #include "./math_util.hpp"
