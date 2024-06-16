@@ -1,4 +1,4 @@
 # map_server_params.yaml
 map_server:
     ros__parameters:
-        yaml_filename: "/home/tlab5/Documents/scout_ros2_ws/src/bringup/map/D4F_map.yaml"
+        yaml_filename: "/home/tlab5/Documents/scout_ros2_ws/src/bringup/map/GYM_map.yaml"

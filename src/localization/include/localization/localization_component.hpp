@@ -152,7 +152,7 @@ public:
                 geometry_msgs::msg::TransformStamped transform_stamped;
                 transform_stamped.header.stamp = current_time;
                 transform_stamped.header.frame_id = params_.pose_frame_id;
-                transform_stamped.child_frame_id = "base_link";
+                transform_stamped.child_frame_id = "ekf_base_link";
                 transform_stamped.transform = make_geometry_transform(make_eigen_vector3d(ekf_module_->getCurrentPose(current_time).pose));
                 broadcaster_.sendTransform(transform_stamped);
             });
@@ -283,7 +283,7 @@ private:
         nav_msgs::msg::Odometry odometry;
         odometry.header.stamp = current_ekf_pose.header.stamp;
         odometry.header.frame_id = current_ekf_pose.header.frame_id;
-        odometry.child_frame_id = "base_link";
+        odometry.child_frame_id = "ekf_base_link";
         odometry.pose = pose_cov.pose;
         odometry.twist = twist_cov.twist;
         pub_odom_->publish(odometry);

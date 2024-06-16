@@ -3,15 +3,15 @@ emcl2:
     odom_freq: 20
     transform_tolerance: 0.2
     global_frame_id: "map"
-    odom_frame_id: "slam_odom"
+    odom_frame_id: "odom"
     base_frame_id: "slam_base_link"
     footprint_frame_id: "slam_base_link"
     laser_min_range: 0.0
     laser_max_range: 100000000.0
     scan_increment: 1
-    initial_pose_x: 2.6
-    initial_pose_y: 42.0
-    initial_pose_a: -1.57
+    initial_pose_x: 3.9
+    initial_pose_y: 19.95
+    initial_pose_a: 0.0
     num_particles: 500
     alpha_threshold: 0.5
     expansion_radius_position: 0.1

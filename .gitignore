@@ -6,3 +6,5 @@ rosbag/
 doxygen-awesome-css/
 html/
 *.pyc
+pose_log.csv
+vgm_log.csv

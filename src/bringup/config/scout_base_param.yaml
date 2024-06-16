@@ -2,8 +2,8 @@ scout:
   ros__parameters:
     use_sim_time: false
     port_name: can0
-    odom_frame: initial_pos
-    base_frame: odom
+    odom_frame: odom
+    base_frame: base_link
     odom_topic_name: odom
     is_scout_mini: true
     is_omni_wheel: true

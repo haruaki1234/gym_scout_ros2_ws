@@ -46,7 +46,8 @@ private:
     //! 位置姿勢ログファイル
     std::ofstream pose_log_file_;
     //! 初期時間
-    std::optional<int64_t> first_time_ = std::nullopt;
+    std::optional<int64_t> first_time_rosbag_ = std::nullopt;
+    std::optional<int64_t> first_time_play_ = std::nullopt;
 
     //! VGMログファイル
     std::ofstream umap_log_file_;
@@ -76,7 +77,7 @@ public:
         broadcaster_(this),                            //
         tf_buffer_(this->get_clock()),                 //
         tf_listener_(tf_buffer_),                      //
-        pose_log_file_("pose_log.csv"), umap_log_file_("umap_log.csv")
+        pose_log_file_("pose_log.csv"), umap_log_file_("vgm_log.csv")
     {
         using namespace std::chrono_literals;
         tf_buffer_.setUsingDedicatedThread(true);
@@ -85,19 +86,32 @@ public:
         static auto initial_pos = get_parameter("start_pos").as_double_array();
 
         static auto scan_pub = this->create_publisher<sensor_msgs::msg::LaserScan>("slam_scan", 1);
+
         static auto error_marker_pub = this->create_publisher<visualization_msgs::msg::MarkerArray>("error_marker", 1);
 
-        static auto scout_status_sub = create_subscription<scout_msgs::msg::ScoutStatus>("/scout_status", 10, [&](const scout_msgs::msg::ScoutStatus::SharedPtr msg) {
-            if (msg->control_mode == 1) {
-                if (!first_time_) {
-                    first_time_ = this->now().nanoseconds();
-                }
-            }
-            else {
-                first_time_ = std::nullopt;
-            }
+        static auto scan_sub = this->create_subscription<sensor_msgs::msg::LaserScan>("scan", 1, [&](sensor_msgs::msg::LaserScan::SharedPtr msg) {
+            sensor_msgs::msg::LaserScan scan_msg = *msg;
+            scan_msg.header.frame_id = "slam_laser";
+            scan_pub->publish(scan_msg);
         });
+
+        // static auto scout_status_sub = create_subscription<scout_msgs::msg::ScoutStatus>("/scout_status", 10, [&](const scout_msgs::msg::ScoutStatus::SharedPtr msg) {
+        //     if (msg->control_mode == 1) {
+        //         if (!first_time_) {
+        //             first_time_ = this->now().nanoseconds();
+        //         }
+        //     }
+        //     else {
+        //         first_time_ = std::nullopt;
+        //     }
+        // });
+
         static auto odom_sub = this->create_subscription<nav_msgs::msg::Odometry>("odom", 1, [&](nav_msgs::msg::Odometry::SharedPtr msg) {
+            if (!first_time_rosbag_) {
+                first_time_rosbag_ = rclcpp::Time(msg->header.stamp).nanoseconds();
+                first_time_play_ = this->now().nanoseconds();
+            }
+
             double init_x = initial_pos[0];
             double init_y = initial_pos[1];
             double init_yaw = initial_pos[2];
@@ -106,7 +120,7 @@ public:
             odom_yaw_ = tf2::getYaw(msg->pose.pose.orientation) + init_yaw;
             geometry_msgs::msg::TransformStamped transform_stamped;
             transform_stamped.header.stamp = msg->header.stamp;
-            transform_stamped.header.frame_id = "slam_odom";
+            transform_stamped.header.frame_id = "odom";
             transform_stamped.child_frame_id = "slam_base_link";
             transform_stamped.transform.translation.x = odom_x_;
             transform_stamped.transform.translation.y = odom_y_;
@@ -125,8 +139,10 @@ public:
                 RCLCPP_ERROR(this->get_logger(), "Transform error: %s", ex.what());
                 return;
             }
-            if (first_time_) {
-                pose_log_file_ << (this->now().nanoseconds() - first_time_.value()) / 1e9 << ",";
+            if (first_time_rosbag_ && first_time_play_) {
+                int64_t dt = this->now().nanoseconds() - first_time_play_.value();
+                pose_log_file_ << std::fixed << std::setprecision(10) << (first_time_rosbag_.value() + dt) / 1e9 << ",";
+                pose_log_file_ << dt / 1e9 << ",";
                 pose_log_file_ << msg->pose.pose.position.x << "," << msg->pose.pose.position.y << "," << tf2::getYaw(msg->pose.pose.orientation) << ",";
                 pose_log_file_ << tf_map_to_slam_base_link.transform.translation.x << "," << tf_map_to_slam_base_link.transform.translation.y << "," << tf2::getYaw(tf_map_to_slam_base_link.transform.rotation) << ",";
                 pose_log_file_ << odom_x_ << "," << odom_y_ << "," << odom_yaw_ << ",";
@@ -134,30 +150,27 @@ public:
             }
         });
 
-        static auto scan_sub = this->create_subscription<sensor_msgs::msg::LaserScan>("scan", 1, [&](sensor_msgs::msg::LaserScan::SharedPtr msg) {
-            sensor_msgs::msg::LaserScan scan_msg = *msg;
-            scan_msg.header.frame_id = "slam_laser";
-            scan_pub->publish(scan_msg);
-        });
-
         static auto umap_sub = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>("umap_pos", 1, [&](geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg) {
             geometry_msgs::msg::TransformStamped tf_map_to_slam_base_link;
-            try {
-                tf_map_to_slam_base_link = tf_buffer_.lookupTransform("map", "slam_base_link", msg->header.stamp);
+            // try {
+            //     tf_map_to_slam_base_link = tf_buffer_.lookupTransform("map", "slam_base_link", msg->header.stamp);
+            // }
+            // catch (tf2::TransformException& ex) {
+            //     // RCLCPP_ERROR(this->get_logger(), "Transform error: %s", ex.what());
+            //     try {
+            //         tf_map_to_slam_base_link = tf_buffer_.lookupTransform("map", "slam_base_link", rclcpp::Time(0));
+            //     }
+            //     catch (tf2::TransformException& ex) {
+            //         RCLCPP_ERROR(this->get_logger(), "Transform error: %s", ex.what());
+            //         return;
+            //     }
+            // }
+            if (first_time_rosbag_) {
+                umap_log_file_ << std::fixed << std::setprecision(10) << rclcpp::Time(msg->header.stamp).nanoseconds() / 1e9 << ",";
+                umap_log_file_ << (rclcpp::Time(msg->header.stamp).nanoseconds() - first_time_rosbag_.value()) / 1e9 << ",";
+                umap_log_file_ << msg->pose.pose.position.x << "," << msg->pose.pose.position.y << "," << tf2::getYaw(msg->pose.pose.orientation) << ",";
+                umap_log_file_ << std::endl;
             }
-            catch (tf2::TransformException& ex) {
-                // RCLCPP_ERROR(this->get_logger(), "Transform error: %s", ex.what());
-                try {
-                    tf_map_to_slam_base_link = tf_buffer_.lookupTransform("map", "slam_base_link", rclcpp::Time(0));
-                }
-                catch (tf2::TransformException& ex) {
-                    RCLCPP_ERROR(this->get_logger(), "Transform error: %s", ex.what());
-                    return;
-                }
-            }
-            umap_log_file_ << tf_map_to_slam_base_link.transform.translation.x << "," << tf_map_to_slam_base_link.transform.translation.y << "," << tf2::getYaw(tf_map_to_slam_base_link.transform.rotation) << ",";
-            umap_log_file_ << msg->pose.pose.position.x << "," << msg->pose.pose.position.y << "," << tf2::getYaw(msg->pose.pose.orientation) << ",";
-            umap_log_file_ << std::endl;
         });
 
         // static visualization_msgs::msg::MarkerArray marker_array;

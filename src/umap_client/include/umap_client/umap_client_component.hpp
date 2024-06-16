@@ -109,7 +109,7 @@ public:
         static auto umap_pos_pub = create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("umap_pos", rclcpp::QoS(10).reliable());
         static auto umap_timeout_pub = create_publisher<std_msgs::msg::Header>("umap_timeout", rclcpp::QoS(10).reliable());
 
-        static auto image_sub = this->create_subscription<sensor_msgs::msg::Image>("/image_raw", rclcpp::QoS(rclcpp::KeepLast(3)), [&](sensor_msgs::msg::Image::SharedPtr msg) {
+        static auto image_sub = this->create_subscription<sensor_msgs::msg::Image>("/image_raw_c1", rclcpp::QoS(rclcpp::KeepLast(3)), [&](sensor_msgs::msg::Image::SharedPtr msg) {
             image_msg_ = msg;
             take_picture_pos_ = current_pos_;
             take_picture_time_ = this->get_clock()->now();
@@ -146,6 +146,12 @@ public:
 
             double matching_distance = umap_matching_distance + umap_matching_distance_covariance_gain * std::sqrt(xy_covariance_norm_);
             double matching_angle_distance = umap_matching_angle_distance + umap_matching_distance_covariance_gain * std::sqrt(theta_covariance_norm_);
+            // matching_distance = 1.0;
+            // matching_angle_distance = 0.5;
+            // take_picture_pos.x() = 1.0;
+            // take_picture_pos.y() = 15.0;
+            // take_picture_pos.z() = 0;
+            // cv::rotate(canny_img, canny_img, cv::ROTATE_180);
 
             auto umap_result = umap_image_sender.send_from_mat(canny_img, umap::UmapImageSender::pose_t(take_picture_pos.x(), take_picture_pos.y(), 0, 0, 0, take_picture_pos.z()), matching_distance, matching_angle_distance);
             if (umap_result) {

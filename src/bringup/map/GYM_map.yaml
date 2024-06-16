@@ -1,0 +1,7 @@
+image: /home/tlab5/Documents/scout_ros2_ws/src/bringup/map/GYM_map.pgm
+mode: trinary
+resolution: 0.02321
+origin: [-7.5332, -1.0371, 0]
+negate: 0
+occupied_thresh: 0.65
+free_thresh: 0.25
